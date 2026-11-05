@@ -74,4 +74,18 @@ const item = (it, extra) => ({
 const pagos = (condicionOperacion, totalPagar) =>
   condicionOperacion === 1 ? [{ codigo: '01', montoPago: totalPagar, referencia: null, plazo: null, periodo: null }] : null;
 
-module.exports = { AMBIENTE, direccion, emisor, direccionCliente, identificacion, item, pagos };
+/** CAT-005 tipo de contingencia. El simulador solo produce la 1: MH no responde. */
+const TIPO_CONTINGENCIA_MH = 1;
+
+/**
+ * DTE que MH no recibió → se emite en contingencia: modelo diferido (2), transmisión en contingencia (2),
+ * tipoContingencia 1 y motivoContin null (solo se exige con el tipo 5). Mismo codigoGeneracion/numeroControl.
+ */
+const enContingencia = (json, tipoContingencia = TIPO_CONTINGENCIA_MH) => ({
+  ...json,
+  identificacion: { ...json.identificacion, tipoModelo: 2, tipoOperacion: 2, tipoContingencia, motivoContin: null },
+});
+
+module.exports = {
+  AMBIENTE, TIPO_CONTINGENCIA_MH, direccion, emisor, direccionCliente, identificacion, item, pagos, enContingencia,
+};

@@ -258,6 +258,59 @@ Authorization: Bearer {{admin.response.body.data.token}}
 POST {{base}}/dte/{{cont.response.body.data.id}}/reintentar
 Authorization: Bearer {{admin.response.body.data.token}}
 
+### ---------- EVENTO DE CONTINGENCIA ----------
+
+### 6) Dos DTE en contingencia (JSON con tipoModelo 2 / tipoOperacion 2 / tipoContingencia 1)
+# @name cont1
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "items": [ { "productoId": 2, "cantidad": 3 } ] }
+
+###
+# @name cont2
+POST {{base}}/dte/03
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "clienteId": 3, "items": [ { "productoId": 3, "cantidad": 4 } ] }
+
+### 6a) Evento rechazado por MH → se guarda; los DTE siguen en CONTINGENCIA
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: rechazo
+
+{ "dteIds": [ {{cont1.response.body.data.id}}, {{cont2.response.body.data.id}} ] }
+
+### 6b) MH sigue sin responder → 503 MH_NO_DISPONIBLE (no se guarda)
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+X-Simular: contingencia
+
+### 6c) Evento aceptado → los DTE se transmiten y quedan PROCESADO con sello (sin dteIds = todos los pendientes)
+# @name evento
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "motivo": "El servicio de recepción de MH no respondió" }
+
+### 6d) Sin DTE pendientes → 409 ESTADO_INVALIDO
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Eventos de contingencia (cualquier rol)
+GET {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Detalle del evento (DTE con su estado actual, jsonEvento, firmador, respuestaMh)
+GET {{base}}/contingencia/{{evento.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}
+
 ### ---------- CONSULTAS ----------
 
 ### Listado con filtros (tipo 01|03|05, estado, desde/hasta YYYY-MM-DD inclusive, clienteId)

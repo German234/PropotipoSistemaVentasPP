@@ -145,6 +145,13 @@ var api = (function () {
       obtener: function (id) { return request('GET', '/dte/' + id); }
     },
 
+    contingencia: {
+      /** body {dteIds?, motivo?} (ADMIN); simular aplica al evento */
+      enviar: function (body, simular) { return request('POST', '/contingencia', { body: body, simular: simular }); },
+      listar: function () { return request('GET', '/contingencia'); },
+      obtener: function (id) { return request('GET', '/contingencia/' + id); }
+    },
+
     bitacora: function (filtros) { return request('GET', '/bitacora', { query: filtros }); } // {accion, entidad, dteId, usuario, desde, hasta, limite}
   };
 })();
