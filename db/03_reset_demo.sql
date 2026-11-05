@@ -1,6 +1,6 @@
 /* =========================================================
    03_reset_demo.sql — Deja la BD como recién sembrada para repetir la demo.
-   Borra DTE, eventos de invalidación y bitácora; reinicia correlativos (01/03/05 = 0);
+   Borra DTE, eventos de invalidación y de contingencia y bitácora; reinicia correlativos (01/03/05 = 0);
    restaura stock/precio/estado de los productos y clientes del seed y elimina los creados después.
    NO toca usuarios ni emisor. Ejecutar con:
      sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql
@@ -13,6 +13,8 @@ SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
 DELETE FROM dbo.evento_invalidacion;
+DELETE FROM dbo.evento_contingencia_dte;
+DELETE FROM dbo.evento_contingencia;
 DELETE FROM dbo.dte_detalle;
 UPDATE dbo.dte SET dte_relacionado_id = NULL WHERE dte_relacionado_id IS NOT NULL;
 DELETE FROM dbo.dte;
@@ -48,6 +50,7 @@ COMMIT TRANSACTION;
 DBCC CHECKIDENT ('dbo.dte', RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('dbo.dte_detalle', RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('dbo.evento_invalidacion', RESEED, 0) WITH NO_INFOMSGS;
+DBCC CHECKIDENT ('dbo.evento_contingencia', RESEED, 0) WITH NO_INFOMSGS;
 DBCC CHECKIDENT ('dbo.bitacora', RESEED, 0) WITH NO_INFOMSGS;
 GO
 

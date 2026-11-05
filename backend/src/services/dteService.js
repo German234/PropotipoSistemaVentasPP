@@ -5,8 +5,10 @@
  *   correlativo (UPDLOCK) → JSON → firmador → MH simulado → INSERT dte + dte_detalle
  *   → stock (01/03 descuenta, 05 devuelve) solo si PROCESADO / CONTINGENCIA → bitácora EMISION.
  * Un RECHAZADO también se guarda (y consume correlativo) pero no toca el stock.
+ * Si MH no responde, el JSON pasa a contingencia (tipoModelo 2, tipoOperacion 2, tipoContingencia 1) y se vuelve a firmar.
  *
- * reintentar: CONTINGENCIA → reenvía el mismo JSON; si ahora es RECHAZADO revierte el stock.
+ * reintentar: CONTINGENCIA → transmitir() reenvía el mismo JSON; si ahora es RECHAZADO revierte el stock.
+ *             El evento de contingencia (contingenciaService) también usa transmitir().
  * invalidar:  PROCESADO (y 03 sin NC vigente) → evento firmado → MH; si PROCESADO, DTE INVALIDADO y revierte el stock.
  */
 const crypto = require('crypto');
@@ -22,6 +24,7 @@ const factura01 = require('../dte/builders/factura01');
 const ccf03 = require('../dte/builders/ccf03');
 const notaCredito05 = require('../dte/builders/notaCredito05');
 const invalidacion = require('../dte/builders/invalidacion');
+const { enContingencia } = require('../dte/builders/comun');
 const firmador = require('../dte/simuladores/firmador');
 const mh = require('../dte/simuladores/mhRecepcion');
 const mhAnulacion = require('../dte/simuladores/mhAnulacion');
@@ -200,10 +203,15 @@ async function enviarYGuardar({ tipo, tx, q, emisor, usuario, modo, clienteId, c
   const codigoGeneracion = nuevoCodigo();
   const numeroControl = await siguienteNumeroControl(tipo, tx, emisor);
   const { fecEmi, horEmi, fechaEmision } = marcaTiempo();
-  const jsonDte = construir({ numeroControl, codigoGeneracion, fecEmi, horEmi });
+  let jsonDte = construir({ numeroControl, codigoGeneracion, fecEmi, horEmi });
 
-  const firma = firmador.firmar(jsonDte, modo);
+  let firma = firmador.firmar(jsonDte, modo);
   const respuestaMh = mh.recibir({ codigoGeneracion }, modo);
+  if (!respuestaMh) {
+    // MH no respondió: el DTE se emite en contingencia (modelo diferido) y se vuelve a firmar.
+    jsonDte = enContingencia(jsonDte);
+    firma = firmador.firmar(jsonDte, modo);
+  }
   const estado = respuestaMh ? respuestaMh.estado : 'CONTINGENCIA';
   const selloRecibido = respuestaMh ? respuestaMh.selloRecibido : null;
 
@@ -338,6 +346,35 @@ async function emitirNotaCredito(payload, usuario, modo = 'ok') {
 }
 
 /**
+ * Transmite a MH un DTE en CONTINGENCIA (ya bloqueado) con el mismo JSON y firma, actualiza su estado
+ * y registra REINTENTO en bitácora. RECHAZADO → revierte el stock. La usan reintentar y el evento de contingencia.
+ * @param {object} d  fila de cargarDteBloqueado
+ * @param {string} [codigoEvento]  codigoGeneracion del evento de contingencia que autoriza la transmisión
+ * @returns {{estado, selloRecibido, respuestaMh}}
+ */
+async function transmitir(q, d, usuario, modo = 'ok', codigoEvento = null) {
+  const respuestaMh = mh.recibir({ codigoGeneracion: d.codigoGeneracion }, modo);
+  const estado = respuestaMh ? respuestaMh.estado : 'CONTINGENCIA';
+  const selloRecibido = respuestaMh ? respuestaMh.selloRecibido : null;
+
+  if (estado === 'RECHAZADO') await ajustarStock(q, await lineasStock(q, d.id), -signoEmision(d.tipoDte));
+
+  await q(
+    `UPDATE dbo.dte SET estado = @estado, sello_recibido = @sello, respuesta_mh = @respuestaMh WHERE id = @id`,
+    { id: d.id, estado, sello: selloRecibido, respuestaMh: respuestaMh ? JSON.stringify(respuestaMh) : null }
+  );
+  const via = codigoEvento ? `Transmisión por evento de contingencia DTE-${d.tipoDte}` : `Reintento DTE-${d.tipoDte}`;
+  await registrar(usuario.id, 'REINTENTO', 'dte', d.id, {
+    tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: estado,
+    ...(codigoEvento ? { codigoGeneracionEvento: codigoEvento } : {}),
+    mensaje: respuestaMh
+      ? `${via} a MH (simulado): ${respuestaMh.descripcionMsg}`
+      : `${via}: MH sigue sin responder (simulado)`,
+  }, q);
+  return { estado, selloRecibido, respuestaMh };
+}
+
+/**
  * Reintenta el envío de un DTE en CONTINGENCIA con el mismo JSON (mismo codigoGeneracion y numeroControl).
  * PROCESADO → guarda sello. RECHAZADO → revierte el stock que se movió al quedar en contingencia.
  * contingencia otra vez → sigue igual.
@@ -348,23 +385,7 @@ async function reintentar(id, usuario, modo = 'ok') {
     if (d.estado !== 'CONTINGENCIA') {
       throw new AppError('ESTADO_INVALIDO', `Solo se reintenta un DTE en CONTINGENCIA; ${d.numeroControl} está en ${d.estado}`, 409);
     }
-    const respuestaMh = mh.recibir({ codigoGeneracion: d.codigoGeneracion }, modo);
-    const estado = respuestaMh ? respuestaMh.estado : 'CONTINGENCIA';
-    const selloRecibido = respuestaMh ? respuestaMh.selloRecibido : null;
-
-    if (estado === 'RECHAZADO') await ajustarStock(q, await lineasStock(q, d.id), -signoEmision(d.tipoDte));
-
-    await q(
-      `UPDATE dbo.dte SET estado = @estado, sello_recibido = @sello, respuesta_mh = @respuestaMh WHERE id = @id`,
-      { id: d.id, estado, sello: selloRecibido, respuestaMh: respuestaMh ? JSON.stringify(respuestaMh) : null }
-    );
-    await registrar(usuario.id, 'REINTENTO', 'dte', d.id, {
-      tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: estado,
-      mensaje: respuestaMh
-        ? `Reintento DTE-${d.tipoDte} a MH (simulado): ${respuestaMh.descripcionMsg}`
-        : `Reintento DTE-${d.tipoDte}: MH sigue sin responder (simulado)`,
-    }, q);
-
+    const { estado, selloRecibido, respuestaMh } = await transmitir(q, d, usuario, modo);
     return respuestaEmision({
       id: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion,
       selloRecibido, estado, fechaEmision: fechaIso(d.fechaEmision), total: Number(d.total),
@@ -487,5 +508,5 @@ async function invalidar(id, body, usuario, modo = 'ok') {
 
 module.exports = {
   emitir, emitirNotaCredito, reintentar, invalidar,
-  respuestaEmision, marcaTiempo, fechaIso, parse, pendientesAcreditar,
+  respuestaEmision, marcaTiempo, fechaIso, parse, pendientesAcreditar, transmitir, nuevoCodigo,
 };

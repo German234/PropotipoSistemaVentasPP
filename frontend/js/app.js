@@ -4,7 +4,7 @@
   var titles = {
     'v-venta':'Nueva venta','v-inventario':'Inventario','v-clientes':'Clientes','v-historial':'Transacciones','v-borradores':'Borradores',
     'g-dash':'Panel de ventas','g-ventas':'Ventas','g-reportes':'Reportes',
-    'a-usuarios':'Administración','a-bitacora':'Bitácora de auditoría','a-config':'Configuración'
+    'a-usuarios':'Administración','a-contingencia':'Contingencia','a-bitacora':'Bitácora de auditoría','a-config':'Configuración'
   };
   var titleEl = {vendedor:'v-title',gerente:'g-title',admin:'a-title'};
 
@@ -17,6 +17,7 @@
     // F2: gerente y admin son pantallas solo de ADMIN (la API solo tiene ADMIN y VENDEDOR)
     if(role!=='vendedor' && !esAdmin()){ toast('Tu rol no tiene acceso a esa sección','warn'); return; }
     show('app-'+role); closeSidebars();
+    if(role!=='vendedor') contarContingencia();
   }
 
   /* ===== Sesión (F2) ===== */
@@ -49,7 +50,7 @@
     limpiarFormProducto();
     show('app-vendedor'); setPanelById('vendedor','v-venta'); closeSidebars();
     cargarProductos(); buscarClientes(); cargarClientesVenta();
-    ['v-simular','h-simular'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value='ok'; });
+    ['v-simular','h-simular','ct-simular'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value='ok'; });
   }
 
   function cerrarSesionLocal(){
@@ -57,7 +58,8 @@
     document.body.classList.remove('rol-admin');
     inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null;
     closeDteResult(); closeAnular(); closeNotaCredito();
-    dtes = []; bitacora = []; renderHistorial(); renderBitacora();
+    dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; renderHistorial(); renderBitacora(); renderContingencia();
+    var ctm = document.getElementById('ct-motivo'); if(ctm) ctm.value = '';
     renderInventory(); renderCatalog(''); renderCart(); renderClientes(); renderClientForm();
     show('login'); closeSidebars();
   }
@@ -95,6 +97,7 @@
     // F4: paneles que se recargan desde la API al abrirse
     if(usuarioActual && panelId==='v-historial') cargarHistorial();
     if(usuarioActual && panelId==='a-bitacora') cargarBitacora();
+    if(usuarioActual && panelId==='a-contingencia') cargarContingencia();
   }
 
   /* ===== Inventario + catálogo + carrito (en memoria) ===== */
@@ -430,7 +433,7 @@
   var ESTADO_UI = {
     PROCESADO:   { cls:'ok',   txt:'PROCESADO',   msg:'Recibido y sellado por MH' },
     RECHAZADO:   { cls:'err',  txt:'RECHAZADO',   msg:'MH rechazó el documento (no se descontó stock)' },
-    CONTINGENCIA:{ cls:'warn', txt:'CONTINGENCIA',msg:'MH no respondió; queda pendiente de reintento' },
+    CONTINGENCIA:{ cls:'warn', txt:'CONTINGENCIA',msg:'MH no respondió; emitido en contingencia (pendiente del evento de contingencia o de reintento)' },
     INVALIDADO:  { cls:'err',  txt:'INVALIDADO',  msg:'Documento invalidado' }
   };
 
@@ -452,6 +455,9 @@
       if(det.dteRelacionado) extra += fila('CCF relacionado', link(det.dteRelacionado));
       if(det.notasCredito && det.notasCredito.length)
         extra += fila('Notas de crédito', det.notasCredito.map(function(n){ return link(n)+' '+money(n.total); }).join('<br>'));
+      if(det.eventoContingencia) extra += fila('Evento de contingencia',
+        '<div style="display:flex;align-items:center;gap:8px"><a href="#" class="link mono-sm" onclick="verEventoContingencia('+det.eventoContingencia.id+');return false">'+
+        _h(det.eventoContingencia.codigoGeneracion)+'</a>'+resultadoBadge(det.eventoContingencia.estado)+'</div>');
       if(inv) extra += fila('Invalidación', estadoBadge(inv.estado==='PROCESADO'?'INVALIDADO':'RECHAZADO')+' '+_h(inv.motivo||'')+
         (inv.selloRecibido?'<br><span class="mono">'+_h(inv.selloRecibido)+'</span>':' <span class="muted">(evento '+_h(inv.estado)+')</span>'));
     }
@@ -465,6 +471,7 @@
       (e.respuestaMh ? fila('Mensaje MH', _h(e.respuestaMh.codigoMsg+' · '+e.respuestaMh.descripcionMsg)) : '') +
       (obs.length ? fila('Observaciones', obs.map(_h).join('<br>')) : '') +
       extra;
+    document.getElementById('dr-tab-json').textContent = 'JSON DTE';
     document.getElementById('dr-json').textContent = json ? JSON.stringify(json, null, 2) : '(No se pudo obtener el JSON del DTE)';
     var mh = { firmador:e.firmador, respuestaMh:e.respuestaMh };
     if(inv) mh.eventoInvalidacion = { jsonEvento:inv.jsonEvento, firmador:inv.firmador, respuestaMh:inv.respuestaMh };
@@ -668,6 +675,116 @@
       closeNotaCredito();
       return trasOperacion(emision.id);
     }).catch(alertaError).then(function(){ btn.disabled = false; });
+  }
+
+  /* ===== Contingencia: evento de contingencia (POST/GET /api/contingencia) ===== */
+  var ctPendientes = [], ctEventos = [];
+  var TIPO_CONTINGENCIA = { 1:'No disponibilidad de sistema del MH', 2:'No disponibilidad de sistema del emisor',
+    3:'Falla en el servicio de Internet del emisor', 4:'Falla en el suministro de energía eléctrica del emisor', 5:'Otro' };
+  /** Badge de la cola (Administración) y KPI del panel gerencial */
+  function actualizarColaContingencia(n){
+    var b = document.getElementById('cq-badge'); if(b) b.textContent = n+' '+(n===1?'pendiente':'pendientes');
+    var k = document.getElementById('kpi-contingencia'); if(k) k.textContent = n;
+  }
+  function contarContingencia(){
+    if(!esAdmin()) return Promise.resolve();
+    return api.dte.listar({ estado:'CONTINGENCIA' }).then(function(l){ actualizarColaContingencia(l.length); }, function(){});
+  }
+  function irAContingencia(){ setPanelById('admin','a-contingencia'); }
+  function cargarContingencia(){
+    return Promise.all([api.dte.listar({ estado:'CONTINGENCIA' }), api.contingencia.listar()]).then(function(r){
+      ctPendientes = r[0].slice().reverse(); // más antiguo primero (orden del detalleDTE)
+      ctEventos = r[1];
+      renderContingencia();
+    }).catch(alertaError);
+  }
+  function renderContingencia(){
+    var tb = document.getElementById('ct-tbody');
+    if(!tb) return;
+    if(ctPendientes.length===0){
+      tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="padding:22px"><div class="ic">✅</div>No hay DTE en contingencia</div></td></tr>';
+    } else {
+      tb.innerHTML = ctPendientes.map(function(d){
+        return '<tr><td><input type="checkbox" class="ct-chk" value="'+d.id+'" checked onchange="syncTodosContingencia()"></td>'+
+          '<td>'+fmtFechaHora(d.fechaEmision)+'</td>'+
+          '<td><a href="#" class="link mono-sm" onclick="verDte('+d.id+');return false" title="Ver detalle">'+_h(d.numeroControl)+'</a></td>'+
+          '<td>'+(TIPO_DTE[d.tipoDte]||d.tipoDte)+'</td><td>'+_h(d.receptor||'Consumidor final')+'</td>'+
+          '<td class="num">'+money(d.total)+'</td></tr>';
+      }).join('');
+    }
+    var todos = document.getElementById('ct-todos');
+    todos.checked = ctPendientes.length>0; todos.disabled = ctPendientes.length===0;
+    document.getElementById('ct-enviar').disabled = ctPendientes.length===0;
+    document.getElementById('ct-count').textContent = ctPendientes.length+' '+(ctPendientes.length===1?'documento':'documentos');
+    actualizarColaContingencia(ctPendientes.length);
+
+    var te = document.getElementById('ce-tbody');
+    te.innerHTML = ctEventos.length===0
+      ? '<tr><td colspan="7"><div class="empty" style="padding:22px">Aún no se ha enviado ningún evento</div></td></tr>'
+      : ctEventos.map(function(e){
+          return '<tr><td>'+fmtFechaHora(e.fecha)+'</td><td class="mono-sm">'+_h(e.codigoGeneracion)+'</td><td class="num">'+e.cantidad+'</td>'+
+            '<td class="small">'+fmtFechaHora(e.fInicio)+' – '+fmtFechaHora(e.fFin)+'</td><td>'+_h(e.usuario)+'</td>'+
+            '<td>'+resultadoBadge(e.estado)+'</td>'+
+            '<td class="num"><button class="btn-mini" onclick="verEventoContingencia('+e.id+')">Ver</button></td></tr>';
+        }).join('');
+    document.getElementById('ce-count').textContent = ctEventos.length+' '+(ctEventos.length===1?'evento':'eventos');
+  }
+  function seleccionContingencia(){
+    return [].slice.call(document.querySelectorAll('.ct-chk:checked')).map(function(c){ return Number(c.value); });
+  }
+  function marcarTodosContingencia(v){ document.querySelectorAll('.ct-chk').forEach(function(c){ c.checked = v; }); }
+  function syncTodosContingencia(){
+    var n = document.querySelectorAll('.ct-chk').length;
+    document.getElementById('ct-todos').checked = n>0 && seleccionContingencia().length===n;
+  }
+  function enviarEventoContingencia(){
+    var ids = seleccionContingencia();
+    if(ids.length===0){ toast('Selecciona al menos un DTE','warn'); return; }
+    var motivo = document.getElementById('ct-motivo').value.trim();
+    var body = { dteIds: ids }; if(motivo) body.motivo = motivo;
+    var btn = document.getElementById('ct-enviar');
+    btn.disabled = true; btn.textContent = 'Enviando evento a MH...';
+    api.contingencia.enviar(body, simularDe('ct-simular')).then(function(ev){
+      if(ev.estado==='PROCESADO'){
+        var ok = ev.dtes.filter(function(d){ return d.estado==='PROCESADO'; }).length;
+        toast('Evento aceptado · '+ok+' de '+ev.cantidad+' DTE transmitidos y sellados');
+      } else toast('MH rechazó el evento; los DTE siguen en contingencia','warn');
+      document.getElementById('ct-motivo').value = '';
+      return cargarContingencia().then(function(){ mostrarEventoContingencia(ev); });
+    }).catch(function(e){ alertaError(e); return cargarContingencia(); })
+      .then(function(){ btn.textContent = '📡 Enviar evento y transmitir'; btn.disabled = ctPendientes.length===0; });
+  }
+  function verEventoContingencia(id){
+    return api.contingencia.obtener(id).then(mostrarEventoContingencia).catch(alertaError);
+  }
+  /** Detalle del evento en el modal de resultado (pestañas: JSON del evento / firmador + MH) */
+  function mostrarEventoContingencia(ev){
+    var acept = ev.estado==='PROCESADO';
+    function fila(k, v, mono){ return '<div class="dr-row"><span>'+k+'</span><b'+(mono?' class="mono"':'')+'>'+v+'</b></div>'; }
+    document.getElementById('dr-title').textContent = 'Evento de contingencia';
+    document.getElementById('dr-estado').innerHTML = '<span class="dr-badge dr-'+(acept?'ok':'err')+'">'+_h(ev.estado)+'</span>'+
+      '<span class="muted small">'+(acept ? 'MH aceptó el evento; sus DTE se transmitieron' : 'MH rechazó el evento; los DTE siguen en contingencia')+'</span>';
+    var obs = (ev.respuestaMh && ev.respuestaMh.observaciones) || [];
+    document.getElementById('dr-datos').innerHTML =
+      fila('Código de generación', _h(ev.codigoGeneracion), true) +
+      fila('Sello recibido', ev.selloRecibido ? _h(ev.selloRecibido) : '<span class="muted">— sin sello —</span>', true) +
+      fila('Fecha de envío', fmtFechaHora(ev.fecha)) +
+      fila('Período de contingencia', fmtFechaHora(ev.fInicio)+' – '+fmtFechaHora(ev.fFin)) +
+      fila('Tipo de contingencia', ev.tipoContingencia+' · '+_h(TIPO_CONTINGENCIA[ev.tipoContingencia]||'')) +
+      fila('Motivo', ev.motivo ? _h(ev.motivo) : '<span class="muted">—</span>') +
+      fila('Enviado por', _h(ev.usuario||'—')) +
+      (ev.respuestaMh ? fila('Mensaje MH', _h(ev.respuestaMh.codigoMsg+' · '+ev.respuestaMh.descripcionMsg)) : '') +
+      (obs.length ? fila('Observaciones', obs.map(_h).join('<br>')) : '') +
+      fila('DTE ('+ev.dtes.length+')', ev.dtes.map(function(d){
+        return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0">'+
+          '<a href="#" class="link mono-sm" onclick="verDte('+d.id+');return false">'+_h(d.numeroControl)+'</a>'+estadoBadge(d.estado)+'</div>';
+      }).join(''));
+    document.getElementById('dr-tab-json').textContent = 'JSON evento';
+    document.getElementById('dr-json').textContent = JSON.stringify(ev.jsonEvento, null, 2);
+    document.getElementById('dr-mh').textContent = JSON.stringify({ firmador:ev.firmador, respuestaMh:ev.respuestaMh }, null, 2);
+    document.getElementById('dr-acciones').innerHTML = '';
+    drTab('json');
+    document.getElementById('dte-result-modal').classList.add('show');
   }
 
   /* ===== Bitácora contra GET /api/bitacora (F4) ===== */

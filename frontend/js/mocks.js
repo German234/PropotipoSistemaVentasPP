@@ -93,8 +93,9 @@ var MockApi = (function () {
     correlativos: { '01': 0, '03': 0, '05': 0 },
     dte: [],          // registro interno (ver guardarDte)
     eventos: [],      // invalidaciones
+    eventosCont: [],  // eventos de contingencia
     bitacora: [],
-    seq: { producto: 10, cliente: 4, dte: 0, evento: 0, bitacora: 0 }
+    seq: { producto: 10, cliente: 4, dte: 0, evento: 0, eventoCont: 0, bitacora: 0 }
   };
 
   /* ---------- auth (token falso: base64url del payload) ---------- */
@@ -205,7 +206,8 @@ var MockApi = (function () {
       version: 2, ambiente: '00', versionApp: 2, estado: rech ? 'RECHAZADO' : 'PROCESADO', codigoGeneracion: codigoGeneracion,
       selloRecibido: rech ? null : sello(ahora), fhProcesamiento: fhProcesamiento(ahora),
       clasificaMsg: rech ? '98' : '10', codigoMsg: rech ? '096' : '001',
-      descripcionMsg: evento ? (rech ? 'EVENTO DE INVALIDACIÓN RECHAZADO (SIMULADO)' : 'EVENTO DE INVALIDACIÓN RECIBIDO')
+      descripcionMsg: evento === 'contingencia' ? (rech ? 'EVENTO DE CONTINGENCIA RECHAZADO (SIMULADO)' : 'EVENTO DE CONTINGENCIA RECIBIDO')
+        : evento ? (rech ? 'EVENTO DE INVALIDACIÓN RECHAZADO (SIMULADO)' : 'EVENTO DE INVALIDACIÓN RECIBIDO')
         : (rech ? 'DOCUMENTO RECHAZADO (SIMULADO)' : 'RECIBIDO'),
       observaciones: rech ? ['Rechazo forzado con X-Simular: rechazo'] : []
     };
@@ -360,8 +362,12 @@ var MockApi = (function () {
 
   /* ---------- guardar + respuesta de emisión ---------- */
   function guardarDte(x, modo) {
-    var firmador = firmar(x.jsonDte), mh = respuestaMh(x.jsonDte.identificacion.codigoGeneracion, modo);
-    var estado = mh ? mh.estado : 'CONTINGENCIA';
+    var mh = respuestaMh(x.jsonDte.identificacion.codigoGeneracion, modo);
+    if (!mh) {  // MH no respondió: el DTE se emite en contingencia (modelo diferido) antes de firmarse
+      var idf = x.jsonDte.identificacion;
+      idf.tipoModelo = 2; idf.tipoOperacion = 2; idf.tipoContingencia = 1; idf.motivoContin = null;
+    }
+    var firmador = firmar(x.jsonDte), estado = mh ? mh.estado : 'CONTINGENCIA';
     var d = {
       id: ++db.seq.dte, tipoDte: x.tipo, numeroControl: x.jsonDte.identificacion.numeroControl,
       codigoGeneracion: x.jsonDte.identificacion.codigoGeneracion, selloRecibido: mh ? mh.selloRecibido : null, estado: estado,
@@ -384,17 +390,81 @@ var MockApi = (function () {
   }
 
   /* ---------- reintentar / invalidar ---------- */
-  function reintentar(id, u, modo) {
-    var d = porId(db.dte, id, 'DTE');
-    if (d.estado !== 'CONTINGENCIA') err('ESTADO_INVALIDO', 'Solo se puede reintentar un DTE en CONTINGENCIA (estado actual: ' + d.estado + ')');
+  function transmitir(d, u, modo, codEvento) {
     var mh = respuestaMh(d.codigoGeneracion, modo);
     if (mh) {
       d.respuestaMh = mh; d.estado = mh.estado; d.selloRecibido = mh.selloRecibido;
       if (mh.estado === 'RECHAZADO') moverStock(d, d.tipoDte === '05' ? -1 : 1);
     }
-    bitacora(u.usuario, 'REINTENTO', 'dte', d.id, 'Reintento DTE-' + d.tipoDte + ': ' + (mh ? mh.descripcionMsg : 'MH sin respuesta'),
-      { numeroControl: d.numeroControl, resultado: d.estado }, { codigoGeneracion: d.codigoGeneracion, resultado: d.estado });
+    var via = codEvento ? 'Transmisión por evento de contingencia DTE-' : 'Reintento DTE-';
+    var datos = { tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: d.estado,
+      mensaje: via + d.tipoDte + (mh ? ' a MH (simulado): ' + mh.descripcionMsg : ': MH sigue sin responder (simulado)') };
+    if (codEvento) datos.codigoGeneracionEvento = codEvento;
+    bitacora(u.usuario, 'REINTENTO', 'dte', d.id, datos.mensaje, datos, { codigoGeneracion: d.codigoGeneracion, resultado: d.estado });
+  }
+  function reintentar(id, u, modo) {
+    var d = porId(db.dte, id, 'DTE');
+    if (d.estado !== 'CONTINGENCIA') err('ESTADO_INVALIDO', 'Solo se puede reintentar un DTE en CONTINGENCIA (estado actual: ' + d.estado + ')');
+    transmitir(d, u, modo);
     return emisionOut(d);
+  }
+
+  /* ---------- evento de contingencia (contingencia-schema-v4) ---------- */
+  function contDteOut(d) {
+    return { id: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion,
+      estado: d.estado, selloRecibido: d.selloRecibido, fechaEmision: d.fechaEmision, total: d.total };
+  }
+  function eventoContOut(ev, completo) {
+    var o = { id: ev.id, codigoGeneracion: ev.codigoGeneracion, estado: ev.estado, selloRecibido: ev.selloRecibido, fecha: ev.fecha,
+      fInicio: ev.fInicio, fFin: ev.fFin, tipoContingencia: 1, motivo: ev.motivo, usuario: ev.usuario, cantidad: ev.dteIds.length };
+    if (completo) {
+      o.dtes = ev.dteIds.map(function (id) { return contDteOut(porId(db.dte, id, 'DTE')); });
+      o.jsonEvento = clone(ev.jsonEvento); o.firmador = clone(ev.firmador); o.respuestaMh = clone(ev.respuestaMh);
+    }
+    return o;
+  }
+  function enviarContingencia(body, u, modo) {
+    requireAdmin(u);
+    var lista;
+    if (body.dteIds != null) {
+      if (!Array.isArray(body.dteIds) || !body.dteIds.length) err('VALIDACION', 'dteIds debe ser una lista con al menos un id');
+      var ids = body.dteIds.map(function (x, i) { return entero(x, 'dteIds[' + i + ']', 1); })
+        .filter(function (x, i, a) { return a.indexOf(x) === i; }).sort(function (a, b) { return a - b; });
+      if (ids.length > 1000) err('VALIDACION', 'Un evento de contingencia admite máximo 1000 DTE');
+      lista = ids.map(function (id) {
+        var d = porId(db.dte, id, 'DTE');
+        if (d.estado !== 'CONTINGENCIA') err('ESTADO_INVALIDO', 'Solo se reportan DTE en CONTINGENCIA; ' + d.numeroControl + ' está en ' + d.estado);
+        return d;
+      });
+    } else {
+      lista = db.dte.filter(function (d) { return d.estado === 'CONTINGENCIA'; }).slice(0, 1000);
+      if (!lista.length) err('ESTADO_INVALIDO', 'No hay DTE en CONTINGENCIA para reportar');
+    }
+    var motivo = textoOpc(body.motivo);
+    if (motivo && motivo.length > 500) err('VALIDACION', 'motivo admite máximo 500 caracteres');
+    var ahora = new Date(), cod = uuid(), e = db.emisor;
+    var inicio = lista.map(function (d) { return d.fechaEmision; }).sort()[0], fin = isoLocal(ahora);
+    var jsonEvento = {
+      identificacion: { version: 4, ambiente: '00', codigoGeneracion: cod, fTransmision: ymd(ahora), hTransmision: hms(ahora) },
+      emisor: { nit: e.nit, nombre: e.nombre, nombreResponsable: u.nombre, tipoDocResponsable: '13', numeroDocResponsable: '000000000',
+        tipoEstablecimiento: e.tipoEstablecimiento, codEstableMH: e.codEstable, codPuntoVentaMH: e.codPuntoVenta, telefono: e.telefono, correo: e.correo },
+      detalleDTE: lista.map(function (d, i) { return { noItem: i + 1, tipoDoc: d.tipoDte, codigoGeneracion: d.codigoGeneracion }; }),
+      motivo: { fInicio: inicio.slice(0, 10), fFin: ymd(ahora), hInicio: inicio.slice(11, 19), hFin: hms(ahora), tipoContingencia: 1, motivoContingencia: motivo }
+    };
+    var firmador = firmar(jsonEvento), mh = respuestaMh(cod, modo, 'contingencia');
+    var resumen = { codigoGeneracionEvento: cod, cantidad: lista.length, dteIds: lista.map(function (d) { return d.id; }) };
+    if (!mh) {
+      bitacora(u.usuario, 'CONTINGENCIA', 'evento_contingencia', null, 'MH no respondió al evento de contingencia (simulado)',
+        Object.assign({}, resumen, { resultado: 'SIN_RESPUESTA', mensaje: 'MH no respondió al evento de contingencia (simulado)' }), { resultado: 'SIN_RESPUESTA' });
+      err('MH_NO_DISPONIBLE', 'MH no respondió al evento de contingencia (simulado). Los DTE siguen en contingencia; intente de nuevo.');
+    }
+    var ev = { id: ++db.seq.eventoCont, codigoGeneracion: cod, estado: mh.estado, selloRecibido: mh.selloRecibido, fecha: fin,
+      fInicio: inicio, fFin: fin, motivo: motivo, usuario: u.usuario, dteIds: resumen.dteIds, jsonEvento: jsonEvento, firmador: firmador, respuestaMh: mh };
+    db.eventosCont.push(ev);
+    var msg = 'Evento de contingencia con ' + lista.length + ' DTE (simulado): ' + mh.descripcionMsg;
+    bitacora(u.usuario, 'CONTINGENCIA', 'evento_contingencia', ev.id, msg, Object.assign({}, resumen, { resultado: mh.estado, mensaje: msg }), { resultado: mh.estado });
+    if (mh.estado === 'PROCESADO') lista.forEach(function (d) { transmitir(d, u, 'ok', cod); });
+    return { status: 201, data: eventoContOut(ev, true) };
   }
 
   function invalidar(id, body, u, modo) {
@@ -480,6 +550,8 @@ var MockApi = (function () {
     o.invalidacion = ev ? { id: ev.id, codigoGeneracion: ev.codigoGeneracion, estado: ev.estado, tipoAnulacion: ev.tipoAnulacion, motivo: ev.motivo,
       fecha: ev.fecha, usuario: ev.usuario, selloRecibido: ev.selloRecibido, jsonEvento: clone(ev.jsonEvento), firmador: clone(ev.firmador),
       respuestaMh: clone(ev.respuestaMh) } : null;
+    var ecs = db.eventosCont.filter(function (x) { return x.dteIds.indexOf(d.id) !== -1; }), ec = ecs[ecs.length - 1];
+    o.eventoContingencia = ec ? { id: ec.id, codigoGeneracion: ec.codigoGeneracion, estado: ec.estado, selloRecibido: ec.selloRecibido, fecha: ec.fecha } : null;
     return o;
   }
   function listarBitacora(q) {
@@ -554,6 +626,9 @@ var MockApi = (function () {
     if (method === 'GET' && path === '/dte') return listarDte(query);
     if (method === 'GET' && (m = /^\/dte\/(\d+)$/.exec(path))) return obtenerDte(m[1]);
     if (method === 'GET' && path === '/bitacora') return listarBitacora(query);
+    if (method === 'POST' && path === '/contingencia') return enviarContingencia(body, u, modoSimular(headers));
+    if (method === 'GET' && path === '/contingencia') return db.eventosCont.slice().reverse().map(function (e) { return eventoContOut(e, false); });
+    if (method === 'GET' && (m = /^\/contingencia\/(\d+)$/.exec(path))) return eventoContOut(porId(db.eventosCont, m[1], 'Evento de contingencia'), true);
 
     err('NO_ENCONTRADO', 'Ruta no encontrada: ' + method + ' /api' + path);
   }

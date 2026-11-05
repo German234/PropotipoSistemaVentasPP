@@ -297,7 +297,7 @@
   .dr-datos{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px}
   .dr-row{display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px}
   .dr-row:last-child{border-bottom:0}
-  .dr-row span{color:var(--muted);min-width:150px;flex-shrink:0}
+  .dr-row > span{color:var(--muted);min-width:150px;flex-shrink:0}
   .dr-row b{font-weight:600;word-break:break-all}
   .dr-row b.mono{font-family:Consolas,"Courier New",monospace;font-size:12.5px}
   .dr-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:0}
@@ -305,7 +305,7 @@
   .dr-tabs button.active{color:var(--blue-dark);border-bottom-color:var(--blue)}
   .dr-tabs .dr-copy{margin-left:auto;font-size:12px}
   .dr-pre{background:#0e1b2a;color:#d6e4f2;font-family:Consolas,"Courier New",monospace;font-size:12px;line-height:1.45;padding:12px 14px;border-radius:0 0 var(--radius-sm) var(--radius-sm);max-height:340px;overflow:auto;white-space:pre;margin:0}
-  @media (max-width:600px){ .dr-row{flex-direction:column;gap:2px} .dr-row span{min-width:0} }
+  @media (max-width:600px){ .dr-row{flex-direction:column;gap:2px} .dr-row > span{min-width:0} }
   .pay-types{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
   .pay-opt{padding:11px 6px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);text-align:center;background:var(--surface);transition:all .15s}
   .pay-opt .pi{font-size:19px;display:block;margin-bottom:3px;line-height:1}
@@ -681,7 +681,7 @@
             <div class="kpi"><div class="label">Ventas del mes</div><div class="val">$48,320</div><div class="delta up">▲ +12%</div></div>
             <div class="kpi"><div class="label">Documentos emitidos</div><div class="val">1,284</div><div class="delta up">▲ +8%</div></div>
             <div class="kpi"><div class="label">Ticket promedio</div><div class="val">$37.60</div><div class="delta down">▼ −3%</div></div>
-            <div class="kpi"><div class="label">Pendientes contingencia</div><div class="val">6</div><div class="delta flat">En cola</div></div>
+            <div class="kpi"><div class="label">Pendientes contingencia</div><div class="val" id="kpi-contingencia">—</div><div class="delta flat">En cola</div></div>
           </div>
           <div class="charts">
             <div class="card card-pad">
@@ -761,6 +761,7 @@
       <div class="side-brand"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span> Sistema de Ventas</div>
       <nav class="side-nav">
         <button class="active" data-panel="a-usuarios" onclick="setPanel('admin',this)"><span class="ic">👥</span> Usuarios</button>
+        <button data-panel="a-contingencia" onclick="setPanel('admin',this)"><span class="ic">📡</span> Contingencia</button>
         <button data-panel="a-bitacora" onclick="setPanel('admin',this)"><span class="ic">📋</span> Bitácora</button>
         <button data-panel="a-config" onclick="setPanel('admin',this)"><span class="ic">⚙️</span> Configuración</button>
         <button onclick="enter('vendedor')"><span class="ic">🧾</span> Punto de venta</button>
@@ -820,9 +821,48 @@
               </div>
             </div>
             <div class="card card-pad">
-              <div class="page-head" style="margin-bottom:12px"><div class="card-title" style="margin:0">Cola de contingencia</div><span class="st st-pending">6 pendientes</span></div>
-              <p class="cont-note">Documentos en espera de reenvío al Ministerio de Hacienda. Reintento automático cada 15 min.</p>
-              <button class="btn btn-ghost btn-block" onclick="toast('Reintentando envío de 6 documentos…')">↻ Reintentar envío ahora</button>
+              <div class="page-head" style="margin-bottom:12px"><div class="card-title" style="margin:0">Cola de contingencia</div><span class="st st-pending" id="cq-badge">— pendientes</span></div>
+              <p class="cont-note">DTE emitidos sin respuesta de MH. Se reportan con un evento de contingencia y luego se transmiten.</p>
+              <button class="btn btn-ghost btn-block" onclick="irAContingencia()">📡 Ir a contingencia</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contingencia (evento de contingencia, contingencia-schema-v4) -->
+        <div class="panel" id="a-contingencia" style="display:none">
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">DTE en contingencia</h3><span class="muted small" id="ct-count"></span></div>
+              <div class="filters"><button class="btn-mini" onclick="cargarContingencia()">↻ Actualizar</button></div>
+            </div>
+            <p class="cont-note">Documentos que MH no recibió (modelo diferido, tipo de contingencia 1: MH no disponible). Al restablecerse el servicio se envía el <b>evento de contingencia</b> con los seleccionados; si MH lo acepta, se transmiten y quedan PROCESADOS con sello.</p>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th style="width:34px"><input type="checkbox" id="ct-todos" onchange="marcarTodosContingencia(this.checked)" title="Seleccionar todos"></th><th>Fecha</th><th>Número de control</th><th>Tipo</th><th>Receptor</th><th class="num">Total</th></tr></thead>
+              <tbody id="ct-tbody"></tbody>
+            </table>
+            </div>
+            <div class="field" style="margin-top:16px">
+              <label for="ct-motivo">Motivo de la contingencia <span class="muted small">(opcional, máx. 500)</span></label>
+              <textarea id="ct-motivo" rows="2" maxlength="500" placeholder="Ej.: El servicio de recepción de MH no respondió"></textarea>
+            </div>
+            <div class="sim-mh" style="margin:0 0 14px">
+              <label for="ct-simular">Simular MH (evento de contingencia)</label>
+              <select id="ct-simular" class="pill">
+                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option>
+              </select>
+            </div>
+            <div class="form-actions" style="justify-content:flex-end">
+              <button class="btn btn-primary" id="ct-enviar" onclick="enviarEventoContingencia()">📡 Enviar evento y transmitir</button>
+            </div>
+          </div>
+          <div class="card card-pad">
+            <div class="page-head"><div><h3 style="display:inline-block;margin-right:8px">Eventos de contingencia</h3><span class="muted small" id="ce-count"></span></div></div>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>Fecha</th><th>Código de generación</th><th class="num">DTE</th><th>Período</th><th>Usuario</th><th>Estado MH</th><th class="num">Acciones</th></tr></thead>
+              <tbody id="ce-tbody"></tbody>
+            </table>
             </div>
           </div>
         </div>
@@ -835,7 +875,7 @@
               <div class="filters" style="flex-wrap:wrap;justify-content:flex-end">
                 <select class="pill" id="b-accion" onchange="cargarBitacora()">
                   <option value="">Todas las acciones</option>
-                  <option value="EMISION">Emisión DTE</option><option value="REINTENTO">Reintento</option><option value="INVALIDACION">Invalidación</option>
+                  <option value="EMISION">Emisión DTE</option><option value="REINTENTO">Reintento</option><option value="INVALIDACION">Invalidación</option><option value="CONTINGENCIA">Evento de contingencia</option>
                   <option value="LOGIN">Inicio de sesión</option><option value="LOGIN_FALLIDO">Login fallido</option>
                   <option value="CREAR">Crear</option><option value="ACTUALIZAR">Actualizar</option>
                 </select>

@@ -146,6 +146,35 @@ CREATE TABLE dbo.evento_invalidacion (
 );
 GO
 
+/* ---------- evento_contingencia (schemas-mh/contingencia-schema-v4.json) ---------- */
+IF OBJECT_ID('dbo.evento_contingencia', 'U') IS NULL
+CREATE TABLE dbo.evento_contingencia (
+    id                 INT IDENTITY(1,1) PRIMARY KEY,
+    usuario_id         INT           NOT NULL REFERENCES dbo.usuarios(id),
+    codigo_generacion  CHAR(36)      NOT NULL CONSTRAINT uq_evento_cont_codigo_generacion UNIQUE,
+    tipo_contingencia  TINYINT       NOT NULL DEFAULT 1,
+    motivo             NVARCHAR(500) NULL,
+    f_inicio           DATETIME2(0)  NOT NULL,                  -- emisión del primer DTE del evento
+    f_fin              DATETIME2(0)  NOT NULL,                  -- envío del evento
+    fecha              DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME(),
+    estado             VARCHAR(12)   NOT NULL CONSTRAINT ck_evento_cont_estado CHECK (estado IN ('PROCESADO','RECHAZADO')),
+    json_evento        NVARCHAR(MAX) NOT NULL,
+    firma              NVARCHAR(MAX) NULL,
+    respuesta_mh       NVARCHAR(MAX) NULL,
+    sello_recibido     VARCHAR(40)   NULL
+);
+GO
+
+/* ---------- evento_contingencia_dte: DTE incluidos en cada evento (detalleDTE) ---------- */
+IF OBJECT_ID('dbo.evento_contingencia_dte', 'U') IS NULL
+CREATE TABLE dbo.evento_contingencia_dte (
+    evento_id  INT NOT NULL REFERENCES dbo.evento_contingencia(id),
+    dte_id     INT NOT NULL REFERENCES dbo.dte(id),
+    no_item    INT NOT NULL,
+    CONSTRAINT pk_evento_contingencia_dte PRIMARY KEY (evento_id, dte_id)
+);
+GO
+
 /* ---------- bitacora ---------- */
 IF OBJECT_ID('dbo.bitacora', 'U') IS NULL
 CREATE TABLE dbo.bitacora (

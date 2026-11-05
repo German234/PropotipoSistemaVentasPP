@@ -3,6 +3,7 @@ const { query } = require('../config/db');
 const { AppError } = require('../utils/respuesta');
 const v = require('../utils/validar');
 const { respuestaEmision, fechaIso, parse, pendientesAcreditar } = require('./dteService');
+const { ultimoDeDte } = require('./contingenciaService');
 
 const TIPOS = ['01', '03', '05'];
 const ESTADOS = ['PROCESADO', 'RECHAZADO', 'CONTINGENCIA', 'INVALIDADO'];
@@ -73,7 +74,7 @@ async function ultimoEvento(dteId) {
 }
 
 /**
- * Detalle: respuesta de emisión + jsonDte, cliente, items, invalidacion, dteRelacionado y notasCredito.
+ * Detalle: respuesta de emisión + jsonDte, cliente, items, invalidacion, eventoContingencia, dteRelacionado y notasCredito.
  * En un 03 cada ítem trae `acreditada` y `pendiente` (para armar la NC).
  */
 async function obtener(id) {
@@ -137,6 +138,7 @@ async function obtener(id) {
       : null,
     notasCredito: nc,
     invalidacion: await ultimoEvento(id),
+    eventoContingencia: await ultimoDeDte(id),
   };
 }
 

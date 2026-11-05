@@ -26,10 +26,10 @@ Base: `http://localhost:3000/api` · JSON en camelCase · ambiente MH `"00"`.
 | `ESTADO_INVALIDO` | 409 | La operación no aplica al estado actual del DTE |
 | `STOCK_INSUFICIENTE` | 409 | No hay existencias suficientes |
 | `DB_NO_DISPONIBLE` | 503 | No hay conexión con SQL Server |
-| `MH_NO_DISPONIBLE` | 503 | MH (simulado) no respondió a un evento de invalidación (`X-Simular: contingencia`) |
+| `MH_NO_DISPONIBLE` | 503 | MH (simulado) no respondió a un evento de invalidación o de contingencia (`X-Simular: contingencia`) |
 | `ERROR_INTERNO` | 500 | Error no controlado |
 
-**Header `X-Simular`** (opcional, en emisión, reintento e invalidación): `ok` (por defecto) | `rechazo` | `contingencia`. Fuerza el resultado de MH para la demo.
+**Header `X-Simular`** (opcional, en emisión, reintento, invalidación y evento de contingencia): `ok` (por defecto) | `rechazo` | `contingencia`. Fuerza el resultado de MH para la demo.
 
 **Estados de DTE:** `PROCESADO`, `RECHAZADO`, `CONTINGENCIA`, `INVALIDADO` (y `BORRADOR`, solo interno mientras se arma el documento; la API no lo devuelve en una emisión terminada).
 
@@ -205,7 +205,7 @@ Parcial, igual que productos. Se revalida el registro completo (p. ej. quitar el
 ```
 
 Con `X-Simular: rechazo` → `estado: "RECHAZADO"`, `selloRecibido: null`, `respuestaMh.codigoMsg` de error y `observaciones` con el motivo (la respuesta HTTP sigue siendo `ok:true`; el DTE queda registrado). No descuenta stock.
-Con `X-Simular: contingencia` → `estado: "CONTINGENCIA"`, `selloRecibido: null`, `respuestaMh: null`. **Sí descuenta stock** (la venta ocurrió). Se puede reintentar.
+Con `X-Simular: contingencia` → `estado: "CONTINGENCIA"`, `selloRecibido: null`, `respuestaMh: null`. **Sí descuenta stock** (la venta ocurrió). El DTE se emite en contingencia: `jsonDte.identificacion` pasa a `tipoModelo: 2` (diferido), `tipoOperacion: 2` (contingencia), `tipoContingencia: 1` (MH no disponible), `motivoContin: null`, y se firma ese JSON. Se reporta con un evento de contingencia (`POST /api/contingencia`) o se reintenta uno a uno.
 Un valor de `X-Simular` distinto de `ok|rechazo|contingencia` → 400 `VALIDACION`.
 El RECHAZADO también consume correlativo (el número de control queda usado por ese registro).
 
@@ -349,6 +349,7 @@ Respuesta de emisión (`firmador` y `respuestaMh` parseados) más:
 | `dteRelacionadoId`, `dteRelacionado` | En una NC: `{ id, tipoDte, numeroControl, codigoGeneracion, estado }` del CCF; si no, `null` |
 | `notasCredito` | En un 03: `[{ id, numeroControl, codigoGeneracion, estado, fechaEmision, total }]` (todas, cualquier estado); si no, `[]` |
 | `invalidacion` | Último evento (procesado o rechazado): `{ id, codigoGeneracion, estado, tipoAnulacion, motivo, fecha, usuario, selloRecibido, jsonEvento, firmador, respuestaMh }` o `null` |
+| `eventoContingencia` | Último evento de contingencia que incluyó al DTE: `{ id, codigoGeneracion, estado, selloRecibido, fecha }` o `null` (detalle en `GET /api/contingencia/:id`) |
 
 ```json
 {
@@ -372,10 +373,72 @@ Respuesta de emisión (`firmador` y `respuestaMh` parseados) más:
     },
     "items": [ { "numItem": 1, "productoId": 1, "codigo": "P001", "descripcion": "Cuaderno universitario", "cantidad": 2, "unidad": 59, "precioUni": 2.83, "descuento": 0, "ventaGravada": 5.66, "ivaItem": 0.65 } ],
     "dteRelacionadoId": null, "dteRelacionado": null, "notasCredito": [],
-    "invalidacion": null
+    "invalidacion": null,
+    "eventoContingencia": null
   }
 }
 ```
+
+---
+
+## Contingencia
+
+Evento de contingencia según `schemas-mh/contingencia-schema-v4.json`. Cuando MH vuelve a estar disponible se le reporta qué DTE se emitieron en contingencia; si acepta el evento, se transmiten esos DTE.
+
+### POST /api/contingencia → 201 (solo ADMIN)
+
+```json
+{ "dteIds": [21, 22], "motivo": "El servicio de recepción de MH no respondió" }
+```
+
+- `dteIds` opcional (1–1000 ids, sin repetir): todos deben estar en `CONTINGENCIA` (otro estado → 409 `ESTADO_INVALIDO`; inexistente → 404). Sin `dteIds` → todos los DTE en `CONTINGENCIA` (los 1000 más antiguos); si no hay ninguno → 409 `ESTADO_INVALIDO`.
+- `motivo` opcional (máx. 500) → `motivo.motivoContingencia` (o `null`). `tipoContingencia` siempre 1 (MH no disponible: la única que produce el simulador).
+- Responsable = usuario del token (`tipoDocResponsable "13"`, `numeroDocResponsable "000000000"`). `fInicio/hInicio` = emisión del DTE más antiguo del evento; `fFin/hFin` y `fTransmision/hTransmision` = envío del evento.
+- `X-Simular` aplica al evento:
+  - `ok` → evento `PROCESADO` con sello propio; se transmite cada DTE (mismo JSON y firma) y queda `PROCESADO` con su sello (en bitácora, un `REINTENTO` por DTE con `codigoGeneracionEvento`).
+  - `rechazo` → evento `RECHAZADO` sin sello (se guarda, respuesta `ok:true`); los DTE siguen en `CONTINGENCIA`.
+  - `contingencia` → MH sigue sin responder: 503 `MH_NO_DISPONIBLE`; no se guarda el evento (sí queda en bitácora con resultado `SIN_RESPUESTA`).
+- `POST /api/dte/:id/reintentar` sigue disponible para transmitir un DTE suelto.
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 3, "codigoGeneracion": "9C1D...", "estado": "PROCESADO", "selloRecibido": "2026K3J4...",
+    "fecha": "2026-11-05T10:41:31", "fInicio": "2026-11-05T10:12:08", "fFin": "2026-11-05T10:41:31",
+    "tipoContingencia": 1, "motivo": "El servicio de recepción de MH no respondió", "usuario": "admin", "cantidad": 2,
+    "dtes": [
+      { "id": 21, "tipoDte": "01", "numeroControl": "DTE-01-M001P001-000000000000005", "codigoGeneracion": "F408...", "estado": "PROCESADO", "selloRecibido": "2026HXPV...", "fechaEmision": "2026-11-05T10:12:08", "total": 0.51 },
+      { "id": 22, "tipoDte": "03", "numeroControl": "DTE-03-M001P001-000000000000003", "codigoGeneracion": "7B2A...", "estado": "PROCESADO", "selloRecibido": "2026Q9W1...", "fechaEmision": "2026-11-05T10:15:40", "total": 2.49 }
+    ],
+    "jsonEvento": {
+      "identificacion": { "version": 4, "ambiente": "00", "codigoGeneracion": "9C1D...", "fTransmision": "2026-11-05", "hTransmision": "10:41:31" },
+      "emisor": {
+        "nit": "06140101001010", "nombre": "Batallón Atlacatl, S.A. de C.V.", "nombreResponsable": "Administrador",
+        "tipoDocResponsable": "13", "numeroDocResponsable": "000000000", "tipoEstablecimiento": "02",
+        "codEstableMH": "M001", "codPuntoVentaMH": "P001", "telefono": "22220000", "correo": "facturas@atlacatl.com.sv"
+      },
+      "detalleDTE": [
+        { "noItem": 1, "tipoDoc": "01", "codigoGeneracion": "F408..." },
+        { "noItem": 2, "tipoDoc": "03", "codigoGeneracion": "7B2A..." }
+      ],
+      "motivo": { "fInicio": "2026-11-05", "fFin": "2026-11-05", "hInicio": "10:12:08", "hFin": "10:41:31", "tipoContingencia": 1, "motivoContingencia": "El servicio de recepción de MH no respondió" }
+    },
+    "firmador": { "status": "OK", "body": "..." },
+    "respuestaMh": { "version": 2, "ambiente": "00", "versionApp": 2, "estado": "PROCESADO", "codigoGeneracion": "9C1D...", "selloRecibido": "2026K3J4...", "fhProcesamiento": "05/11/2026 10:41:31", "clasificaMsg": "10", "codigoMsg": "001", "descripcionMsg": "EVENTO DE CONTINGENCIA RECIBIDO", "observaciones": [] }
+  }
+}
+```
+
+En `dtes`, `estado`/`selloRecibido` son los que quedaron tras la transmisión (en un evento rechazado: `CONTINGENCIA`, `null`).
+
+### GET /api/contingencia
+
+Cualquier rol. Eventos guardados (procesados y rechazados), más reciente primero: `[{ id, codigoGeneracion, estado, selloRecibido, fecha, fInicio, fFin, tipoContingencia, motivo, usuario, cantidad }]`.
+
+### GET /api/contingencia/:id
+
+Cualquier rol. Lo mismo que la respuesta de `POST` (`dtes` con el estado **actual** de cada DTE, `jsonEvento`, `firmador`, `respuestaMh`). Inexistente → 404.
 
 ---
 
@@ -399,8 +462,8 @@ Cualquier rol autenticado. Más reciente primero; `limite` 1–1000 (defecto 200
 }
 ```
 
-`detalle` = mensaje legible; `datos` = detalle completo registrado (objeto, o texto si no era JSON). `dteId`/`codigoGeneracion` solo en entradas de `entidad: "dte"`. `resultado`: estado devuelto por MH (`PROCESADO`, `RECHAZADO`, `CONTINGENCIA`) o `SIN_RESPUESTA` (invalidación sin respuesta de MH).
+`detalle` = mensaje legible; `datos` = detalle completo registrado (objeto, o texto si no era JSON). `dteId`/`codigoGeneracion` solo en entradas de `entidad: "dte"`. `resultado`: estado devuelto por MH (`PROCESADO`, `RECHAZADO`, `CONTINGENCIA`) o `SIN_RESPUESTA` (invalidación o evento de contingencia sin respuesta de MH).
 
-Forma de `datos` según la acción: `EMISION` → `{ tipoDte, numeroControl, codigoGeneracion, resultado, firmador, mensaje }`; `REINTENTO` → igual sin `firmador`; `INVALIDACION` → `{ tipoDte, numeroControl, codigoGeneracion, codigoGeneracionEvento, resultado, mensaje }`; `CREAR` → el registro creado; `ACTUALIZAR` → `{ antes, cambios }`; `LOGIN_FALLIDO` → `{ usuario }`; `LOGIN` → `null`.
+Forma de `datos` según la acción: `EMISION` → `{ tipoDte, numeroControl, codigoGeneracion, resultado, firmador, mensaje }`; `REINTENTO` → igual sin `firmador` (más `codigoGeneracionEvento` si lo transmitió un evento de contingencia); `INVALIDACION` → `{ tipoDte, numeroControl, codigoGeneracion, codigoGeneracionEvento, resultado, mensaje }`; `CONTINGENCIA` (`entidad: "evento_contingencia"`, `entidadId` = id del evento o `null` si MH no respondió) → `{ codigoGeneracionEvento, cantidad, dteIds, resultado, mensaje }`; `CREAR` → el registro creado; `ACTUALIZAR` → `{ antes, cambios }`; `LOGIN_FALLIDO` → `{ usuario }`; `LOGIN` → `null`.
 
-`accion`: `LOGIN`, `LOGIN_FALLIDO`, `CREAR`, `ACTUALIZAR`, `EMISION`, `REINTENTO`, `INVALIDACION`. `entidad`: `usuario`, `producto`, `cliente`, `dte`.
+`accion`: `LOGIN`, `LOGIN_FALLIDO`, `CREAR`, `ACTUALIZAR`, `EMISION`, `REINTENTO`, `INVALIDACION`, `CONTINGENCIA`. `entidad`: `usuario`, `producto`, `cliente`, `dte`, `evento_contingencia`.
