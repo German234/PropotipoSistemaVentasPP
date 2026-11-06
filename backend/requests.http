@@ -1,0 +1,334 @@
+### Ejemplos para la extensión REST Client (VS Code) o JetBrains HTTP Client.
+### Ejecuta primero "login admin": el token queda en {{admin.response.body.data.token}}.
+
+@base = http://localhost:3000/api
+
+### Health (sin token)
+GET {{base}}/health
+
+### ---------- AUTH ----------
+
+# @name admin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "usuario": "admin", "password": "admin123" }
+
+###
+# @name vendedor
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "usuario": "vendedor", "password": "vendedor123" }
+
+### Login incorrecto → 401 CREDENCIALES
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "usuario": "admin", "password": "mala" }
+
+### ---------- PRODUCTOS ----------
+
+### Listar (búsqueda por código o descripción)
+GET {{base}}/productos?q=cuaderno
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Listar incluyendo inactivos
+GET {{base}}/productos?incluirInactivos=1
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Obtener uno
+GET {{base}}/productos/1
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Crear (solo ADMIN; precio SIN IVA)
+POST {{base}}/productos
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "codigo": "P011", "descripcion": "Regla de 30 cm", "precio": 0.85, "stock": 80, "unidad": 59 }
+
+### Actualizar parcial (solo ADMIN)
+PUT {{base}}/productos/1
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "precio": 2.75, "stock": 120 }
+
+### Desactivar (borrado lógico)
+PUT {{base}}/productos/1
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "activo": false }
+
+### Vendedor intenta crear → 403 SIN_PERMISO
+POST {{base}}/productos
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{ "codigo": "P099", "descripcion": "No permitido", "precio": 1 }
+
+### ---------- CLIENTES ----------
+
+### Listar contribuyentes que coincidan con "roble"
+GET {{base}}/clientes?q=roble&tipo=CONTRIBUYENTE
+Authorization: Bearer {{vendedor.response.body.data.token}}
+
+### Obtener uno
+GET {{base}}/clientes/1
+Authorization: Bearer {{vendedor.response.body.data.token}}
+
+### Crear consumidor final
+POST {{base}}/clientes
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{ "tipo": "CONSUMIDOR", "nombre": "Ana Martínez", "direccion": "Soyapango", "correo": "ana@correo.com" }
+
+### Crear contribuyente (nit, nrc, codActividad y descActividad obligatorios; se aceptan guiones)
+POST {{base}}/clientes
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{
+  "tipo": "CONTRIBUYENTE",
+  "nombre": "Comercial La Ceiba, S.A. de C.V.",
+  "nit": "0614-150390-102-5",
+  "nrc": "345678-9",
+  "codActividad": "46900",
+  "descActividad": "Venta al por mayor de otros productos",
+  "direccion": "Santa Ana",
+  "correo": "compras@laceiba.com.sv"
+}
+
+### Contribuyente sin NRC → 400 VALIDACION
+POST {{base}}/clientes
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{ "tipo": "CONTRIBUYENTE", "nombre": "Sin NRC", "nit": "06141503901025" }
+
+### Actualizar parcial
+PUT {{base}}/clientes/1
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{ "correo": "nuevo@correo.com" }
+
+### ---------- EMISOR ----------
+GET {{base}}/emisor
+Authorization: Bearer {{vendedor.response.body.data.token}}
+
+### ---------- DTE (emisión) ----------
+### Header opcional X-Simular: ok (defecto) | rechazo | contingencia
+### Ver los ids de clientes con GET /clientes (en el seed local: 1-2 CONSUMIDOR, 3-4 CONTRIBUYENTE)
+
+### Factura 01 a consumidor final (sin receptor), precios con IVA
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{
+  "clienteId": null,
+  "condicionOperacion": 1,
+  "items": [
+    { "productoId": 1, "cantidad": 2, "descuento": 0 },
+    { "productoId": 2, "cantidad": 10, "descuento": 0.50 }
+  ]
+}
+
+### CCF 03 a un CONTRIBUYENTE (precios sin IVA, IVA en resumen.tributos)
+POST {{base}}/dte/03
+Authorization: Bearer {{vendedor.response.body.data.token}}
+Content-Type: application/json
+
+{
+  "clienteId": 3,
+  "condicionOperacion": 1,
+  "items": [ { "productoId": 1, "cantidad": 40, "descuento": 0 } ]
+}
+
+### Rechazo simulado de MH → 201 con estado RECHAZADO, sin sello y sin descontar stock
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: rechazo
+
+{ "clienteId": 1, "items": [ { "productoId": 3, "cantidad": 5 } ] }
+
+### Contingencia (MH no responde) → estado CONTINGENCIA, respuestaMh null, sí descuenta stock
+POST {{base}}/dte/03
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "clienteId": 3, "items": [ { "productoId": 4, "cantidad": 2 } ] }
+
+### CCF a un CONSUMIDOR → 400 VALIDACION
+POST {{base}}/dte/03
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "clienteId": 1, "items": [ { "productoId": 1, "cantidad": 1 } ] }
+
+### Stock insuficiente → 409 STOCK_INSUFICIENTE
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "items": [ { "productoId": 7, "cantidad": 9999 } ] }
+
+### =====================================================================
+### FLUJO COMPLETO (B4): CCF → NC → invalidar factura → contingencia → reintentar
+### Ejecutar en orden; cada paso usa el id del anterior (@name).
+### =====================================================================
+
+### 1) CCF 03 de 40 cuadernos al contribuyente 3
+# @name ccf
+POST {{base}}/dte/03
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "clienteId": 3, "items": [ { "productoId": 1, "cantidad": 40 } ] }
+
+### 2) NC 05 por 5 cuadernos del CCF (mismo receptor; devuelve 5 al stock)
+# @name nc
+POST {{base}}/dte/05
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "dteRelacionadoId": {{ccf.response.body.data.id}}, "items": [ { "productoId": 1, "cantidad": 5 } ] }
+
+### 2b) NC por más de lo pendiente (quedan 35) → 400 VALIDACION
+POST {{base}}/dte/05
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "dteRelacionadoId": {{ccf.response.body.data.id}}, "items": [ { "productoId": 1, "cantidad": 50 } ] }
+
+### 2c) Detalle del CCF: items con acreditada/pendiente y notasCredito
+GET {{base}}/dte/{{ccf.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### 2d) Invalidar el CCF con NC vigente → 409 ESTADO_INVALIDO
+POST {{base}}/dte/{{ccf.response.body.data.id}}/invalidar
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "motivo": "Rescindir operación" }
+
+### 3) Factura 01 que luego se invalida
+# @name factura
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "clienteId": 1, "items": [ { "productoId": 2, "cantidad": 10 } ] }
+
+### 3b) Invalidar la factura (tipoAnulacion 2 por defecto) → INVALIDADO, devuelve stock
+POST {{base}}/dte/{{factura.response.body.data.id}}/invalidar
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "tipoAnulacion": 2, "motivo": "Error en la información del documento" }
+
+### 3c) Invalidarla otra vez → 409 ESTADO_INVALIDO
+POST {{base}}/dte/{{factura.response.body.data.id}}/invalidar
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "motivo": "Otra vez" }
+
+### 4) Factura en contingencia (MH no responde): estado CONTINGENCIA, sí descuenta stock
+# @name cont
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "items": [ { "productoId": 3, "cantidad": 4 } ] }
+
+### 5) Reintentar → PROCESADO con sello (mismo codigoGeneracion y numeroControl)
+###    (con X-Simular: rechazo quedaría RECHAZADO y se devolvería el stock)
+POST {{base}}/dte/{{cont.response.body.data.id}}/reintentar
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### 5b) Reintentar un DTE que ya no está en CONTINGENCIA → 409 ESTADO_INVALIDO
+POST {{base}}/dte/{{cont.response.body.data.id}}/reintentar
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### ---------- EVENTO DE CONTINGENCIA ----------
+
+### 6) Dos DTE en contingencia (JSON con tipoModelo 2 / tipoOperacion 2 / tipoContingencia 1)
+# @name cont1
+POST {{base}}/dte/01
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "items": [ { "productoId": 2, "cantidad": 3 } ] }
+
+###
+# @name cont2
+POST {{base}}/dte/03
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: contingencia
+
+{ "clienteId": 3, "items": [ { "productoId": 3, "cantidad": 4 } ] }
+
+### 6a) Evento rechazado por MH → se guarda; los DTE siguen en CONTINGENCIA
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+X-Simular: rechazo
+
+{ "dteIds": [ {{cont1.response.body.data.id}}, {{cont2.response.body.data.id}} ] }
+
+### 6b) MH sigue sin responder → 503 MH_NO_DISPONIBLE (no se guarda)
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+X-Simular: contingencia
+
+### 6c) Evento aceptado → los DTE se transmiten y quedan PROCESADO con sello (sin dteIds = todos los pendientes)
+# @name evento
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+Content-Type: application/json
+
+{ "motivo": "El servicio de recepción de MH no respondió" }
+
+### 6d) Sin DTE pendientes → 409 ESTADO_INVALIDO
+POST {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Eventos de contingencia (cualquier rol)
+GET {{base}}/contingencia
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Detalle del evento (DTE con su estado actual, jsonEvento, firmador, respuestaMh)
+GET {{base}}/contingencia/{{evento.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### ---------- CONSULTAS ----------
+
+### Listado con filtros (tipo 01|03|05, estado, desde/hasta YYYY-MM-DD inclusive, clienteId)
+GET {{base}}/dte?tipo=03&estado=PROCESADO&desde=2026-01-01&hasta=2026-12-31
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Detalle de la NC (dteRelacionado = el CCF)
+GET {{base}}/dte/{{nc.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Detalle de la factura invalidada (incluye invalidacion con el evento)
+GET {{base}}/dte/{{factura.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Bitácora (filtros: accion, entidad, dteId, usuario, desde, hasta, limite)
+GET {{base}}/bitacora?limite=50
+Authorization: Bearer {{admin.response.body.data.token}}
+
+### Bitácora de un DTE
+GET {{base}}/bitacora?dteId={{ccf.response.body.data.id}}
+Authorization: Bearer {{admin.response.body.data.token}}

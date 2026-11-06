@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Ventas — Prototipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#13314f;
+    --navy-dark:#0e2640;
+    --navy-soft:#1c4067;
+    --blue:#1f6fb2;
+    --blue-dark:#1a5d96;
+    --bg:#f4f6f9;
+    --surface:#ffffff;
+    --surface-2:#fafbfc;
+    --border:#e4e9f0;
+    --border-strong:#d3dbe5;
+    --ink:#1c2b3a;
+    --muted:#6b7c8f;
+    --muted-2:#90a0b0;
+    --success:#15a34a;
+    --success-bg:#dcfce7;
+    --danger:#dc2f3e;
+    --danger-bg:#fdecee;
+    --warn:#c2790a;
+    --warn-bg:#fdf2dd;
+    --radius:10px;
+    --radius-sm:7px;
+    --shadow:0 1px 2px rgba(16,40,68,.06),0 4px 16px rgba(16,40,68,.06);
+    --shadow-lg:0 12px 40px rgba(14,38,64,.18);
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    font-size:14px;
+    line-height:1.5;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select{font-family:inherit;font-size:14px}
+  .screen{display:none;min-height:100vh}
+  .screen.active{display:block}
+
+  /* ============ LOGIN ============ */
+  #login.active{display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(1200px 600px at 70% -10%,#1c4067 0%,#0e2640 55%,#0a1d33 100%);}
+  .login-card{
+    width:100%;max-width:880px;background:var(--surface);border-radius:16px;
+    overflow:hidden;display:grid;grid-template-columns:1fr 1fr;box-shadow:var(--shadow-lg);
+  }
+  .login-brand{
+    background:linear-gradient(165deg,var(--navy-soft),var(--navy-dark));
+    color:#fff;padding:48px 40px;display:flex;flex-direction:column;justify-content:center;
+  }
+  .brand-logo{
+    width:60px;height:60px;border-radius:14px;background:rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:28px;
+    border:1px solid rgba(255,255,255,.15);
+  }
+  .login-brand h1{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:10px}
+  .login-brand p{color:#9fb6cf;font-size:13px;line-height:1.6;max-width:240px}
+  .login-form{padding:48px 44px;display:flex;flex-direction:column;justify-content:center}
+  .login-form h2{font-size:20px;font-weight:600;margin-bottom:24px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:6px}
+  .field input{
+    width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+    background:var(--surface);color:var(--ink);transition:border-color .15s,box-shadow .15s;
+  }
+  .field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,178,.15)}
+  .login-row{display:flex;align-items:center;justify-content:space-between;margin:6px 0 22px;font-size:13px}
+  .check{display:flex;align-items:center;gap:8px;color:var(--ink);cursor:pointer}
+  .check input{width:16px;height:16px;accent-color:var(--blue)}
+  .link{color:var(--blue);text-decoration:none}
+  .link:hover{text-decoration:underline}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px 18px;border-radius:var(--radius-sm);font-weight:600;font-size:14px;
+    transition:background .15s,transform .05s,box-shadow .15s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{background:var(--blue-dark)}
+  .btn-block{width:100%}
+  .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--ink)}
+  .btn-ghost:hover{background:var(--surface-2);border-color:var(--muted-2)}
+  .btn-soft{background:var(--surface-2);color:var(--ink);border:1px solid var(--border-strong)}
+  .btn-soft:hover{background:#eef4fa;border-color:var(--blue);color:var(--blue-dark)}
+  .btn-mini{padding:5px 12px;border-radius:6px;font-size:12.5px;font-weight:500;border:1px solid var(--border-strong);background:var(--surface);color:var(--blue-dark)}
+  .btn-mini:hover{background:#eef4fa;border-color:var(--blue)}
+  .btn-mini.danger{color:var(--danger);border-color:#f0c9ce}
+  .btn-mini.danger:hover{background:var(--danger-bg);border-color:var(--danger)}
+  input.pill{padding:6px 11px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-size:13px}
+  input.pill:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,178,.15)}
+  .login-roles{text-align:center;margin-top:20px;font-size:12.5px;color:var(--muted)}
+  .login-roles a{color:var(--blue);text-decoration:none;font-weight:500}
+  .login-roles a:hover{text-decoration:underline}
+
+  /* ============ APP SHELL ============ */
+  .app{display:flex;min-height:100vh}
+  .sidebar{
+    width:236px;flex-shrink:0;background:var(--navy-dark);color:#cdd9e6;
+    display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh;
+  }
+  .side-brand{display:flex;align-items:center;gap:10px;padding:8px 8px 18px;color:#fff;font-weight:600;font-size:15px}
+  .side-brand .mark{width:26px;height:26px;border-radius:7px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .side-nav{display:flex;flex-direction:column;gap:3px;flex:1}
+  .side-nav button{
+    display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;
+    color:#aebccd;font-size:13.5px;font-weight:500;text-align:left;transition:background .15s,color .15s;
+  }
+  .side-nav button .ic{width:18px;text-align:center;opacity:.9}
+  .side-nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+  .side-nav button.active{background:var(--blue);color:#fff}
+  .side-foot{border-top:1px solid rgba(255,255,255,.08);padding-top:12px;margin-top:8px}
+  .side-foot button{width:100%;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;color:#9fb0c2;font-size:13.5px;transition:background .15s,color .15s}
+  .side-foot button:hover{background:rgba(255,255,255,.06);color:#fff}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{
+    height:60px;background:var(--surface);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;padding:0 26px;position:sticky;top:0;z-index:20;
+  }
+  .topbar h2{font-size:17px;font-weight:600}
+  .top-right{display:flex;align-items:center;gap:14px}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500}
+  .badge-online{background:var(--success-bg);color:var(--success)}
+  .badge-online .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+  .content{padding:26px;flex:1}
+  .hamburger{display:none;font-size:22px;color:var(--ink);padding:4px}
+
+  /* ============ COMPONENTS ============ */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-pad{padding:18px}
+  .card-title{font-size:14px;font-weight:600;margin-bottom:14px}
+  .muted{color:var(--muted)}
+  .small{font-size:12.5px}
+
+  .filters{display:flex;gap:10px}
+  select.pill{padding:7px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);cursor:pointer}
+
+  /* sales layout */
+  .sale-grid{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+  .sale-field label{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:6px}
+  .input-add{display:flex;gap:8px;margin-bottom:18px}
+  .input-add input{flex:1;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
+  .input-add input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,178,.15)}
+  .btn-add{width:44px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-2);font-size:20px;color:var(--blue);display:flex;align-items:center;justify-content:center}
+  .btn-add:hover{background:#eef4fa}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-2);padding:10px 12px;border-bottom:1px solid var(--border)}
+  td{padding:13px 12px;border-bottom:1px solid var(--border);font-size:13.5px}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right}
+  .prod-name{font-weight:500}
+
+  .dte-types{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .dte-opt{padding:12px 10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);text-align:center;background:var(--surface);transition:all .15s}
+  .dte-opt .t{font-size:13px;font-weight:600}
+  .dte-opt .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .dte-opt.sel{border-color:var(--blue);background:#f0f7fd}
+  .dte-opt.sel .t{color:var(--blue-dark)}
+
+  .totals{font-size:13.5px}
+  .totals .row{display:flex;justify-content:space-between;padding:6px 0;color:var(--muted)}
+  .totals .row span:last-child{color:var(--ink);font-weight:500}
+  .totals .grand{border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:16px}
+  .totals .grand span{color:var(--ink)!important;font-weight:700}
+
+  /* KPIs */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:12px;color:var(--muted);font-weight:500}
+  .kpi .val{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:6px}
+  .kpi .delta{font-size:12px;font-weight:600;margin-top:4px}
+  .delta.up{color:var(--success)}.delta.down{color:var(--danger)}.delta.flat{color:var(--muted)}
+
+  .charts{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+  .bars{display:flex;align-items:flex-end;gap:14px;height:200px;padding:10px 4px 0}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+  .bar{width:100%;max-width:34px;background:linear-gradient(180deg,var(--blue),var(--blue-dark));border-radius:5px 5px 0 0;transition:height .6s cubic-bezier(.2,.7,.2,1)}
+  .bar-col .lbl{font-size:11px;color:var(--muted)}
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:18px}
+  .donut{width:150px;height:150px;border-radius:50%;background:conic-gradient(var(--blue) 0 68%,#bcd6ee 68% 100%);display:flex;align-items:center;justify-content:center}
+  .donut::after{content:"";width:90px;height:90px;border-radius:50%;background:var(--surface)}
+  .legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px;width:100%}
+  .legend .li{display:flex;align-items:center;gap:8px}
+  .legend .sw{width:11px;height:11px;border-radius:3px}
+
+  /* status badges */
+  .st{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500}
+  .st-active{background:var(--success-bg);color:var(--success)}
+  .st-inactive{background:#eef1f5;color:var(--muted)}
+  .st-sealed{background:var(--success-bg);color:var(--success)}
+  .st-pending{background:var(--warn-bg);color:var(--warn)}
+  .st-draft{background:#eef1f5;color:var(--muted)}
+  .st-annulled{background:var(--danger-bg);color:var(--danger)}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+  .icon-btn{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .15s,color .15s}
+  .icon-btn:hover{background:var(--surface-2);color:var(--blue)}
+  .icon-btn.del:hover{color:var(--danger);background:var(--danger-bg)}
+  .u-cell{display:flex;align-items:center;gap:10px}
+  .u-cell .avatar{width:30px;height:30px}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  .log{display:flex;flex-direction:column;gap:14px}
+  .log-item{display:flex;gap:10px;align-items:flex-start}
+  .log-item .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);margin-top:6px;flex-shrink:0}
+  .log-item .t{font-size:13.5px}
+  .log-item .ts{font-size:11.5px;color:var(--muted-2);margin-top:1px}
+  .cont-note{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+
+  body:not(.rol-admin) .solo-admin{display:none !important}
+  .page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .page-head h3{font-size:16px;font-weight:600}
+
+  /* config form */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .form-grid .field input{padding:10px 12px}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+
+  /* toast + modal */
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--navy-dark);color:#fff;padding:13px 20px;border-radius:10px;
+    box-shadow:var(--shadow-lg);font-size:13.5px;display:flex;align-items:center;gap:10px;
+    opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:100;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .tick{width:22px;height:22px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;font-size:13px}
+  .toast .tick.warn{background:var(--warn)}
+
+  .scrim{position:fixed;inset:0;background:rgba(11,26,44,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
+  .scrim.show{opacity:1;pointer-events:auto}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+  .empty .ic{font-size:34px;opacity:.4;margin-bottom:8px}
+
+  /* combo + dropdown catálogo */
+  .combo{position:relative;margin-bottom:18px}
+  .combo .input-add{margin-bottom:0}
+  .dropdown{
+    position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);
+    border:1px solid var(--border-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);
+    max-height:260px;overflow:auto;z-index:25;display:none;
+  }
+  .dropdown.open{display:block}
+  .dd-item{display:flex;justify-content:space-between;align-items:center;padding:10px 13px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--border)}
+  .dd-item:last-child{border-bottom:none}
+  .dd-item:hover{background:#f0f7fd}
+  .dd-item .price{color:var(--muted);font-weight:500}
+  .dd-empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+  .qty{display:inline-flex;align-items:center;gap:8px}
+  .qty button{width:24px;height:24px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface-2);color:var(--blue);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .qty button:hover{background:#eef4fa}
+  .qty span{min-width:18px;text-align:center;font-weight:500}
+
+  .field select{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);cursor:pointer}
+  .field select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,178,.15)}
+  .form-grid .field{margin-bottom:16px}
+  .req{color:var(--danger);font-weight:700}
+  .client-head{font-size:13px;font-weight:600;margin-bottom:3px}
+  .client-hint{font-size:12px;color:var(--muted);margin-bottom:14px}
+  /* F3: venta y resultado de emisión */
+  .cli-resumen{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin:-6px 0 14px;font-size:12.5px}
+  .cli-resumen div{display:flex;gap:8px;padding:2px 0}
+  .cli-resumen span{color:var(--muted);min-width:70px}
+  .sim-mh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding:8px 10px;border:1px dashed var(--warn);border-radius:var(--radius-sm);background:var(--warn-bg);font-size:12.5px;font-weight:500;color:var(--warn)}
+  .sim-mh select.pill{padding:5px 10px;font-size:12.5px}
+  .modal.dr-modal{max-width:760px}
+  /* F4: transacciones, NC, anular, bitácora */
+  .st-rejected{background:transparent;color:var(--danger);border:1px solid #f0c9ce}
+  /* C2: lote de contingencia */
+  .lp-grid{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .lp-grid .field input[type=time]{width:140px}
+  .lp-grid .field input[type=number]{width:130px}
+  .cm-cell{font-size:12.5px;line-height:1.5;white-space:nowrap}
+  #ct-tbody .btn-mini,#ct-tbody td:first-child{white-space:nowrap}
+  #ct-tbody .row-actions{flex-direction:column;align-items:stretch;gap:4px}
+  .lp-switch{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;padding-bottom:10px;cursor:pointer}
+  .lp-switch input{width:16px;height:16px}
+  .lp-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .lp-info > div{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13.5px}
+  .ct-vencido{color:var(--danger);font-weight:600}
+  #ce-tbody .st,.dr-estado .st{white-space:nowrap}
+  .nav-count{margin-left:auto;min-width:20px;padding:1px 7px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:11.5px;font-weight:700;text-align:center}
+  .nav-count:empty{display:none}
+  .mono-sm{font-family:Consolas,"Courier New",monospace;font-size:12px;white-space:nowrap}
+  #h-tbody .btn-mini{white-space:nowrap}
+  .nc-qty{width:74px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;text-align:right;font:inherit}
+  .nc-qty:disabled{background:var(--surface-2);color:var(--muted)}
+  .field textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);font:inherit;resize:vertical}
+  .field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,178,.15)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-danger:hover{filter:brightness(.93)}
+  .btn-danger:disabled,.btn-primary:disabled{opacity:.6;cursor:default}
+  .dr-estado{display:flex;align-items:center;gap:10px;margin:8px 0 14px;flex-wrap:wrap}
+  .dr-badge{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px}
+  .dr-ok{background:var(--success-bg);color:var(--success)}
+  .dr-err{background:var(--danger-bg);color:var(--danger)}
+  .dr-warn{background:var(--warn-bg);color:var(--warn)}
+  .dr-datos{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px}
+  .dr-row{display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px}
+  .dr-row:last-child{border-bottom:0}
+  .dr-row > span{color:var(--muted);min-width:150px;flex-shrink:0}
+  .dr-row b{font-weight:600;word-break:break-all}
+  .dr-row b.mono{font-family:Consolas,"Courier New",monospace;font-size:12.5px}
+  .dr-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:0}
+  .dr-tabs button{padding:8px 12px;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .dr-tabs button.active{color:var(--blue-dark);border-bottom-color:var(--blue)}
+  .dr-tabs .dr-copy{margin-left:auto;font-size:12px}
+  .dr-pre{background:#0e1b2a;color:#d6e4f2;font-family:Consolas,"Courier New",monospace;font-size:12px;line-height:1.45;padding:12px 14px;border-radius:0 0 var(--radius-sm) var(--radius-sm);max-height:340px;overflow:auto;white-space:pre;margin:0}
+  @media (max-width:600px){ .dr-row{flex-direction:column;gap:2px} .dr-row > span{min-width:0} }
+  .pay-types{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .pay-opt{padding:11px 6px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);text-align:center;background:var(--surface);transition:all .15s}
+  .pay-opt .pi{font-size:19px;display:block;margin-bottom:3px;line-height:1}
+  .pay-opt .pl{font-size:12px;font-weight:500;color:var(--ink)}
+  .pay-opt.sel{border-color:var(--blue);background:#f0f7fd}
+  .pay-opt.sel .pl{color:var(--blue-dark)}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(11,26,44,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);width:100%;max-width:440px;padding:22px;max-height:90vh;overflow-y:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .modal-head h3{font-size:17px;font-weight:600}
+  .modal-x{width:30px;height:30px;border-radius:7px;color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center}
+  .modal-x:hover{background:var(--surface-2)}
+  .doc-choice{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:14px 16px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);margin-top:10px;transition:all .15s;background:var(--surface)}
+  .doc-choice:hover{border-color:var(--blue);background:#f0f7fd}
+  .dc-t{font-weight:600;font-size:14px}
+  .dc-s{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .dc-ar{color:var(--blue);font-size:18px}
+
+  .dte-preview{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:8px 0 14px;background:var(--surface-2)}
+  .dte-pv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:14px;background:var(--navy-dark);color:#fff}
+  .dte-pv-emisor{font-weight:600;font-size:13.5px}
+  .dte-pv-sub{font-size:11px;color:#9fb6cf;margin-top:2px}
+  .dte-pv-badge{font-size:11px;font-weight:600;background:rgba(255,255,255,.14);padding:5px 10px;border-radius:20px;white-space:nowrap}
+  .dte-pv-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .dte-pv-meta>div{display:flex;flex-direction:column}
+  .dte-pv-meta span{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-2)}
+  .dte-pv-meta b{font-size:11.5px;font-weight:600;word-break:break-all}
+  .dte-pv-cliente{display:flex;flex-direction:column;gap:1px;padding:10px 14px;border-bottom:1px solid var(--border)}
+  .dte-pv-cliente span{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-2)}
+  .dte-pv-cliente b{font-size:12.5px}
+  .dte-pv-cliente em{font-size:11px;color:var(--muted);font-style:normal}
+  .dte-pv-table{width:100%;border-collapse:collapse}
+  .dte-pv-table th{font-size:9.5px;padding:8px 14px;text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border);font-weight:600}
+  .dte-pv-table td{font-size:12px;padding:7px 14px;border-bottom:1px solid var(--border)}
+  .dte-pv-totals{padding:10px 14px;display:flex;flex-direction:column;gap:3px}
+  .dte-pv-totals>div{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .dte-pv-totals b{color:var(--ink);font-weight:500}
+  .dte-pv-totals .g{font-size:14px;font-weight:700;border-top:1px solid var(--border);margin-top:5px;padding-top:7px}
+  .dte-pv-totals .g span,.dte-pv-totals .g b{color:var(--ink);font-weight:700}
+  .dte-pv-seal{display:flex;gap:10px;align-items:center;padding:12px 14px;background:var(--success-bg);border-top:1px solid var(--border)}
+  .dte-pv-seal .seal-ic{width:26px;height:26px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .dte-pv-seal .seal-t{font-size:11px;font-weight:600;color:var(--success)}
+  .dte-pv-seal .seal-code{font-size:10.5px;color:#15803d;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:2px}
+
+  .dte2{font-size:11px;color:var(--ink);border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;min-width:640px}
+  .dte2 table{width:100%;border-collapse:collapse}
+  .dte2-top{display:flex;gap:14px;align-items:center;padding:14px}
+  .dte2-qr{flex-shrink:0;border:1px solid var(--border);padding:4px;border-radius:6px;line-height:0}
+  .dte2-title{font-size:12px;font-weight:700;letter-spacing:.02em}
+  .dte2-subtitle{font-size:14px;font-weight:700;color:var(--blue-dark);margin-top:2px}
+  .dte2-meta th{width:34%;text-align:left;background:var(--navy-dark);color:#fff;font-size:10px;font-weight:600;padding:6px 10px;border:1px solid #0e2640}
+  .dte2-meta td{font-size:10.5px;padding:6px 10px;border:1px solid var(--border);word-break:break-all}
+  .dte2-parties{display:grid;grid-template-columns:1fr 1fr}
+  .dte2-party-h{background:var(--navy-dark);color:#fff;text-align:center;font-size:11px;font-weight:700;padding:6px;border:1px solid #0e2640}
+  .dte2-party th{width:34%;text-align:left;background:#eef1f5;color:var(--ink);font-size:9.5px;font-weight:600;padding:5px 8px;border:1px solid var(--border);vertical-align:top}
+  .dte2-party td{font-size:10px;padding:5px 8px;border:1px solid var(--border)}
+  .dte2-itemswrap{overflow-x:auto}
+  .dte2-items th{background:var(--navy-dark);color:#fff;font-size:9px;font-weight:600;padding:6px;border:1px solid #0e2640;text-align:left;white-space:nowrap}
+  .dte2-items td{font-size:10px;padding:6px;border:1px solid var(--border)}
+  .dte2-items .num{text-align:right;white-space:nowrap}
+  .dte2-bottom{display:grid;grid-template-columns:1fr 1fr}
+  .dte2-obs-h{background:var(--navy-dark);color:#fff;text-align:center;font-size:11px;font-weight:700;padding:6px;border:1px solid #0e2640}
+  .dte2-obs-body{min-height:70px;border:1px solid var(--border)}
+  .dte2-cond th{background:#eef1f5;text-align:left;font-size:9.5px;padding:5px 8px;border:1px solid var(--border);width:48%}
+  .dte2-cond td{font-size:10px;padding:5px 8px;border:1px solid var(--border)}
+  .dte2-totals{display:flex;flex-direction:column}
+  .dte2-totals .row{display:flex;justify-content:space-between;gap:10px;font-size:10px;padding:5px 10px;border:1px solid var(--border);border-top:none}
+  .dte2-totals .row:first-child{border-top:1px solid var(--border)}
+  .dte2-totals .row span{color:var(--muted)}
+  .dte2-totals .row b{font-weight:600}
+  .dte2-totals .row.total{background:var(--navy-dark);border-color:#0e2640;font-size:12px;font-weight:700}
+  .dte2-totals .row.total span,.dte2-totals .row.total b{color:#fff}
+  .dte2 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width:920px){
+    .charts{grid-template-columns:1fr}
+    .sale-grid{grid-template-columns:1fr}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:860px){
+    .hamburger{display:block}
+    .sidebar{
+      position:fixed;top:0;left:0;z-index:40;transform:translateX(-100%);
+      transition:transform .25s ease;box-shadow:var(--shadow-lg);
+    }
+    .sidebar.open{transform:translateX(0)}
+    .topbar{padding:0 16px}
+    .content{padding:16px}
+    .topbar h2{font-size:15px}
+    .two-col,.form-grid{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
+    #login.active{padding:0}
+    .login-card{grid-template-columns:1fr;border-radius:0;min-height:100vh;max-width:none;box-shadow:none}
+    .login-brand{padding:40px 28px 28px}
+    .login-form{padding:28px}
+    .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+    .kpi .val{font-size:20px}
+    .badge-text{display:none}
+    .filters{flex-direction:column}
+    .row-actions{gap:2px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="screen active" id="login">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-logo"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+      <h1>Sistema de Ventas</h1>
+      <p>Ventas y Facturación Electrónica · El Salvador</p>
+    </div>
+    <div class="login-form">
+      <h2>Iniciar sesión</h2>
+      <div class="field">
+        <label>Usuario</label>
+        <input id="login-user" type="text" autocomplete="username" placeholder="admin" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="login-row">
+        <label class="check"><input type="checkbox" checked> Recordarme</label>
+        <a href="#" class="link" onclick="return false">¿Olvidó su contraseña?</a>
+      </div>
+      <button class="btn btn-primary btn-block" id="login-btn" onclick="doLogin()">Ingresar</button>
+      <div class="login-roles">
+        Usuarios de prueba: <b>admin</b> / admin123 · <b>vendedor</b> / vendedor123
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VENDEDOR ================= -->
+<div class="screen" id="app-vendedor">
+  <div class="app">
+    <aside class="sidebar" id="sb-vendedor">
+      <div class="side-brand"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span> Sistema de Ventas</div>
+      <nav class="side-nav">
+        <button class="active" data-panel="v-venta" onclick="setPanel('vendedor',this)"><span class="ic">🧾</span> Nueva venta</button>
+        <button data-panel="v-inventario" onclick="setPanel('vendedor',this)"><span class="ic">📦</span> Inventario</button>
+        <button data-panel="v-clientes" onclick="setPanel('vendedor',this)"><span class="ic">👤</span> Clientes</button>
+        <button data-panel="v-historial" onclick="setPanel('vendedor',this)"><span class="ic">🕘</span> Transacciones</button>
+        <button data-panel="v-borradores" onclick="setPanel('vendedor',this)"><span class="ic">📄</span> Borradores</button>
+        <button class="solo-admin" onclick="enter('admin');irAContingencia()"><span class="ic">📡</span> Contingencia <span class="nav-count" id="sb-ct-badge"></span></button>
+        <button class="solo-admin" onclick="enter('gerente')"><span class="ic">📊</span> Panel gerencial</button>
+        <button class="solo-admin" onclick="enter('admin')"><span class="ic">🛡️</span> Administración</button>
+      </nav>
+      <div class="side-foot">
+        <button onclick="logout()"><span class="ic">↩</span> Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="hamburger" onclick="toggleSidebar('vendedor')">☰</button>
+          <h2 id="v-title">Nueva venta</h2>
+        </div>
+        <div class="top-right">
+          <span class="badge badge-online"><span class="dot"></span><span class="badge-text">MH en línea</span></span>
+          <span class="avatar" id="v-avatar">--</span>
+        </div>
+      </header>
+      <div class="content">
+
+        <!-- Nueva venta -->
+        <div class="panel" id="v-venta">
+          <div class="sale-grid">
+            <div class="card card-pad">
+              <div class="client-head">Datos del cliente</div>
+              <div class="client-hint">Factura 01: cliente opcional. CCF 03: requiere un cliente <b>CONTRIBUYENTE</b> (NIT, NRC y actividad).</div>
+              <div id="v-client-form"></div>
+              <div class="sale-field" style="margin:6px 0 0">
+                <label>Producto</label>
+                <div class="combo" id="v-combo">
+                  <div class="input-add">
+                    <input type="text" id="v-prod-search" autocomplete="off" placeholder="Buscar en catálogo" onfocus="openCatalog()" oninput="filterCatalog(this.value)">
+                    <button class="btn-add" onclick="toggleCatalog()">+</button>
+                  </div>
+                  <div class="dropdown" id="v-catalog"></div>
+                </div>
+              </div>
+              <table>
+                <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num" id="v-pu-head">P. unit.</th><th class="num">Subtotal</th><th></th></tr></thead>
+                <tbody id="v-cart"></tbody>
+              </table>
+            </div>
+
+            <div class="card card-pad">
+              <div class="card-title">Tipo de documento</div>
+              <div class="dte-types">
+                <button class="dte-opt sel" id="vt-01" onclick="pickDte('01')"><div class="t">Factura 01</div><div class="s">Consumidor final · IVA incluido</div></button>
+                <button class="dte-opt" id="vt-03" onclick="pickDte('03')"><div class="t">CCF 03</div><div class="s">Crédito fiscal · IVA desglosado</div></button>
+              </div>
+              <div class="totals">
+                <div class="row"><span id="v-subtotal-label">Total gravado (IVA incluido)</span><span id="v-subtotal">$0.00</span></div>
+                <div class="row"><span id="v-iva-label">IVA incluido (13%)</span><span id="v-iva">$0.00</span></div>
+                <div class="row grand"><span>Total estimado</span><span id="v-total">$0.00</span></div>
+              </div>
+              <div class="card-title" style="margin-top:18px">Método de pago</div>
+              <div class="pay-types">
+                <button class="pay-opt sel" data-pay="Tarjeta" onclick="pickPay(this)"><span class="pi">💳</span><span class="pl">Tarjeta</span></button>
+                <button class="pay-opt" data-pay="Efectivo" onclick="pickPay(this)"><span class="pi">💵</span><span class="pl">Efectivo</span></button>
+              </div>
+              <div class="sim-mh solo-admin">
+                <label for="v-simular">Simular MH</label>
+                <select id="v-simular" class="pill">
+                  <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
+                </select>
+              </div>
+              <button class="btn btn-primary btn-block" id="v-confirmar" style="margin-top:16px" onclick="confirmSale()">✓ Confirmar venta</button>
+              <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="toast('Venta guardada como borrador')">Guardar borrador</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transacciones / Mis ventas (F4) -->
+        <div class="panel" id="v-historial" style="display:none">
+          <div class="card card-pad">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Mis ventas</h3><span class="muted small" id="h-count"></span></div>
+              <div class="filters" style="flex-wrap:wrap;justify-content:flex-end">
+                <input type="text" class="pill" id="h-search" placeholder="Buscar N° control, código o receptor" oninput="renderHistorial()" style="min-width:220px">
+                <select class="pill" id="h-tipo" onchange="cargarHistorial()">
+                  <option value="">Todos los tipos</option><option value="01">Factura 01</option><option value="03">CCF 03</option><option value="05">Nota de crédito 05</option>
+                </select>
+                <select class="pill" id="h-estado" onchange="cargarHistorial()">
+                  <option value="">Todos los estados</option>
+                  <option value="PROCESADO">Aceptado</option>
+                  <option value="INVALIDADO">Anulado</option>
+                  <option value="CONTINGENCIA">Contingencia</option>
+                  <option value="RECHAZADO">Rechazado</option>
+                </select>
+                <input type="date" class="pill" id="h-desde" title="Desde" onchange="cargarHistorial()">
+                <input type="date" class="pill" id="h-hasta" title="Hasta" onchange="cargarHistorial()">
+                <button class="btn-mini" onclick="limpiarFiltrosHistorial()">Limpiar</button>
+                <button class="btn-mini" onclick="cargarHistorial()">↻ Actualizar</button>
+              </div>
+            </div>
+            <div class="sim-mh solo-admin" style="margin:0 0 14px">
+              <label for="h-simular">Simular MH (nota de crédito, anular, reintentar)</label>
+              <select id="h-simular" class="pill">
+                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
+              </select>
+            </div>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>Fecha</th><th>Número de control</th><th>Tipo</th><th>Receptor</th><th class="num">Total</th><th>Estado MH</th><th class="num">Acciones</th></tr></thead>
+              <tbody id="h-tbody"></tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Borradores -->
+        <div class="panel" id="v-borradores" style="display:none">
+          <div class="card card-pad">
+            <div class="page-head"><h3>Borradores</h3><span class="muted small">2 sin confirmar</span></div>
+            <table>
+              <thead><tr><th>Cliente</th><th class="num">Ítems</th><th class="num">Total est.</th><th>Estado</th><th class="num">Acción</th></tr></thead>
+              <tbody>
+                <tr><td>Mini Súper La Esquina</td><td class="num">3</td><td class="num">$156.00</td><td><span class="st st-draft">Borrador</span></td><td class="num"><button class="link" onclick="setPanelById('vendedor','v-venta')">Continuar</button></td></tr>
+                <tr><td>Cliente sin asignar</td><td class="num">1</td><td class="num">$28.00</td><td><span class="st st-draft">Borrador</span></td><td class="num"><button class="link" onclick="setPanelById('vendedor','v-venta')">Continuar</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Inventario -->
+        <div class="panel" id="v-inventario" style="display:none">
+          <div class="page-head"><h3>Inventario</h3><span class="muted small" id="inv-count"></span></div>
+          <div class="sale-grid">
+            <div class="card card-pad">
+              <div class="field"><input id="inv-search" placeholder="Buscar por código o descripción..." oninput="buscarInventario()"></div>
+              <table>
+                <thead><tr><th>Código</th><th>Producto</th><th class="num">Precio (sin IVA)</th><th class="num">Stock</th><th class="num">Acción</th></tr></thead>
+                <tbody id="inv-tbody"></tbody>
+              </table>
+            </div>
+            <div class="card card-pad solo-admin">
+              <div class="card-title" id="inv-form-title">Agregar producto</div>
+              <div class="field"><label>Código <span class="req">*</span></label><input id="inv-codigo" placeholder="Ej. P011"></div>
+              <div class="field"><label>Descripción <span class="req">*</span></label><input id="inv-name" placeholder="Ej. Regla de 30 cm"></div>
+              <div class="field"><label>Precio sin IVA (USD) <span class="req">*</span></label><input id="inv-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+              <div class="field"><label>Stock</label><input id="inv-stock" type="number" min="0" step="1" placeholder="0"></div>
+              <button class="btn btn-primary btn-block" id="inv-save" style="margin-top:6px" onclick="guardarProducto()">+ Agregar al catálogo</button>
+              <button class="btn btn-ghost btn-block" id="inv-cancel" style="margin-top:8px;display:none" onclick="limpiarFormProducto()">Cancelar edición</button>
+              <p class="muted small" style="margin-top:12px">Solo administradores. Los cambios aparecen al instante en el catálogo de Nueva venta.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clientes -->
+        <div class="panel" id="v-clientes" style="display:none">
+          <div class="page-head"><h3>Clientes</h3><span class="muted small" id="cli-count"></span></div>
+          <div class="sale-grid">
+            <div class="card card-pad">
+              <div class="form-grid">
+                <div class="field"><input id="cli-search" placeholder="Buscar por nombre, NIT o NRC..." oninput="buscarClientes()"></div>
+                <div class="field"><select id="cli-filtro-tipo" onchange="buscarClientes()">
+                  <option value="">Todos los tipos</option><option value="CONSUMIDOR">Consumidor</option><option value="CONTRIBUYENTE">Contribuyente</option>
+                </select></div>
+              </div>
+              <table>
+                <thead><tr><th>Nombre</th><th>Tipo</th><th>NIT</th><th>NRC</th><th>Correo</th></tr></thead>
+                <tbody id="cli-tbody"></tbody>
+              </table>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title">Nuevo cliente</div>
+              <div class="field"><label>Tipo <span class="req">*</span></label><select id="cli-tipo" onchange="toggleCamposContribuyente()">
+                <option value="CONSUMIDOR">Consumidor final</option><option value="CONTRIBUYENTE">Contribuyente</option>
+              </select></div>
+              <div class="field"><label>Nombre o razón social <span class="req">*</span></label><input id="cli-nombre" placeholder="Ej. Juan Pérez"></div>
+              <div id="cli-contribuyente" style="display:none">
+                <div class="form-grid">
+                  <div class="field"><label>NIT <span class="req">*</span></label><input id="cli-nit" placeholder="9 o 14 dígitos"></div>
+                  <div class="field"><label>NRC <span class="req">*</span></label><input id="cli-nrc" placeholder="1 a 8 dígitos"></div>
+                </div>
+                <div class="form-grid">
+                  <div class="field"><label>Cód. actividad <span class="req">*</span></label><input id="cli-codact" placeholder="Ej. 46900"></div>
+                  <div class="field"><label>Actividad económica <span class="req">*</span></label><input id="cli-descact" placeholder="Descripción"></div>
+                </div>
+              </div>
+              <div class="field"><label>Dirección</label><input id="cli-direccion" placeholder="Ej. San Salvador, Col. Escalón"></div>
+              <div class="field"><label>Correo</label><input id="cli-correo" type="email" placeholder="cliente@correo.com"></div>
+              <button class="btn btn-primary btn-block" id="cli-save" style="margin-top:6px" onclick="crearCliente()">+ Guardar cliente</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GERENTE ================= -->
+<div class="screen" id="app-gerente">
+  <div class="app">
+    <aside class="sidebar" id="sb-gerente">
+      <div class="side-brand"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span> Sistema de Ventas</div>
+      <nav class="side-nav">
+        <button class="active" data-panel="g-dash" onclick="setPanel('gerente',this)"><span class="ic">📊</span> Dashboard</button>
+        <button data-panel="g-ventas" onclick="setPanel('gerente',this)"><span class="ic">🧾</span> Ventas</button>
+        <button data-panel="g-reportes" onclick="setPanel('gerente',this)"><span class="ic">📁</span> Reportes</button>
+        <button onclick="enter('vendedor')"><span class="ic">🧾</span> Punto de venta</button>
+      </nav>
+      <div class="side-foot">
+        <button onclick="logout()"><span class="ic">↩</span> Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="hamburger" onclick="toggleSidebar('gerente')">☰</button>
+          <h2 id="g-title">Panel de ventas</h2>
+        </div>
+        <div class="top-right filters">
+          <select class="pill"><option>Junio 2026</option><option>Mayo 2026</option><option>Abril 2026</option></select>
+          <select class="pill"><option>Todos</option><option>Factura 01</option><option>Créd. fiscal 03</option></select>
+        </div>
+      </header>
+      <div class="content">
+
+        <!-- Dashboard -->
+        <div class="panel" id="g-dash">
+          <div class="kpi-grid">
+            <div class="kpi"><div class="label">Ventas del mes</div><div class="val">$48,320</div><div class="delta up">▲ +12%</div></div>
+            <div class="kpi"><div class="label">Documentos emitidos</div><div class="val">1,284</div><div class="delta up">▲ +8%</div></div>
+            <div class="kpi"><div class="label">Ticket promedio</div><div class="val">$37.60</div><div class="delta down">▼ −3%</div></div>
+            <div class="kpi"><div class="label">Pendientes contingencia</div><div class="val" id="kpi-contingencia">—</div><div class="delta flat">En cola</div></div>
+          </div>
+          <div class="charts">
+            <div class="card card-pad">
+              <div class="card-title">Ventas por día</div>
+              <div class="bars">
+                <div class="bar-col"><div class="bar" style="height:38%"></div><span class="lbl">Lun</span></div>
+                <div class="bar-col"><div class="bar" style="height:55%"></div><span class="lbl">Mar</span></div>
+                <div class="bar-col"><div class="bar" style="height:46%"></div><span class="lbl">Mié</span></div>
+                <div class="bar-col"><div class="bar" style="height:72%"></div><span class="lbl">Jue</span></div>
+                <div class="bar-col"><div class="bar" style="height:60%"></div><span class="lbl">Vie</span></div>
+                <div class="bar-col"><div class="bar" style="height:88%"></div><span class="lbl">Sáb</span></div>
+                <div class="bar-col"><div class="bar" style="height:64%"></div><span class="lbl">Dom</span></div>
+              </div>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title">Por tipo de DTE</div>
+              <div class="donut-wrap">
+                <div class="donut"></div>
+                <div class="legend">
+                  <div class="li"><span class="sw" style="background:var(--blue)"></span> Factura (01) — 68%</div>
+                  <div class="li"><span class="sw" style="background:#bcd6ee"></span> Créd. fiscal (03) — 32%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ventas -->
+        <div class="panel" id="g-ventas" style="display:none">
+          <div class="card card-pad">
+            <div class="page-head"><h3>Transacciones</h3><button class="btn btn-ghost" onclick="toast('Reporte exportado (CSV)')">⬇ Exportar CSV</button></div>
+            <table>
+              <thead><tr><th>DTE</th><th>Vendedor</th><th>Cliente</th><th>Tipo</th><th class="num">Total</th><th>Estado</th></tr></thead>
+              <tbody>
+                <tr><td>#001284</td><td>J. Hernández</td><td>Comercial El Roble</td><td>Factura 01</td><td class="num">$689.30</td><td><span class="st st-sealed">Sellado</span></td></tr>
+                <tr><td>#001283</td><td>M. Rodríguez</td><td>Distribuidora Cruz</td><td>Créd. fiscal 03</td><td class="num">$1,245.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
+                <tr><td>#001282</td><td>A. Cálix</td><td>Mini Súper La Esquina</td><td>Factura 01</td><td class="num">$156.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
+                <tr><td>#001281</td><td>J. Hernández</td><td>Ana Cálix</td><td>Factura 01</td><td class="num">$42.50</td><td><span class="st st-pending">Contingencia</span></td></tr>
+                <tr><td>#001278</td><td>M. Rodríguez</td><td>Ferretería Santos</td><td>Créd. fiscal 03</td><td class="num">$910.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Reportes -->
+        <div class="panel" id="g-reportes" style="display:none">
+          <div class="two-col" style="margin-top:0">
+            <div class="card card-pad">
+              <div class="card-title">Ventas por vendedor</div>
+              <table>
+                <thead><tr><th>Vendedor</th><th class="num">Docs</th><th class="num">Total</th></tr></thead>
+                <tbody>
+                  <tr><td>J. Hernández</td><td class="num">512</td><td class="num">$19,840</td></tr>
+                  <tr><td>M. Rodríguez</td><td class="num">438</td><td class="num">$17,210</td></tr>
+                  <tr><td>A. Cálix</td><td class="num">334</td><td class="num">$11,270</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title">Descargar reportes</div>
+              <p class="muted small" style="margin-bottom:16px">Genera un reporte consolidado del período seleccionado para análisis externo.</p>
+              <button class="btn btn-ghost btn-block" style="margin-bottom:10px" onclick="toast('Reporte exportado (CSV)')">⬇ Exportar a CSV</button>
+              <button class="btn btn-ghost btn-block" onclick="toast('Reporte exportado (PDF)')">⬇ Exportar a PDF</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMINISTRADOR ================= -->
+<div class="screen" id="app-admin">
+  <div class="app">
+    <aside class="sidebar" id="sb-admin">
+      <div class="side-brand"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span> Sistema de Ventas</div>
+      <nav class="side-nav">
+        <button class="active" data-panel="a-usuarios" onclick="setPanel('admin',this)"><span class="ic">👥</span> Usuarios</button>
+        <button data-panel="a-contingencia" onclick="setPanel('admin',this)"><span class="ic">📡</span> Contingencia <span class="nav-count" id="sb-ct-badge-admin"></span></button>
+        <button data-panel="a-bitacora" onclick="setPanel('admin',this)"><span class="ic">📋</span> Bitácora</button>
+        <button data-panel="a-config" onclick="setPanel('admin',this)"><span class="ic">⚙️</span> Configuración</button>
+        <button onclick="enter('vendedor')"><span class="ic">🧾</span> Punto de venta</button>
+      </nav>
+      <div class="side-foot">
+        <button onclick="logout()"><span class="ic">↩</span> Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="hamburger" onclick="toggleSidebar('admin')">☰</button>
+          <h2 id="a-title">Administración</h2>
+        </div>
+        <div class="top-right">
+          <button class="btn btn-primary" onclick="toast('Formulario de nuevo usuario')">+ Nuevo usuario</button>
+        </div>
+      </header>
+      <div class="content">
+
+        <!-- Usuarios -->
+        <div class="panel" id="a-usuarios">
+          <div class="card card-pad" style="margin-bottom:16px">
+            <table>
+              <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th class="num">Acciones</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div class="u-cell"><span class="avatar">MR</span> María Rodríguez</div></td>
+                  <td>Gerente de ventas</td><td><span class="st st-active">Activo</span></td>
+                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
+                </tr>
+                <tr>
+                  <td><div class="u-cell"><span class="avatar">JH</span> José Hernández</div></td>
+                  <td>Vendedor operativo</td><td><span class="st st-active">Activo</span></td>
+                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
+                </tr>
+                <tr>
+                  <td><div class="u-cell"><span class="avatar">AC</span> Ana Cálix</div></td>
+                  <td>Vendedor operativo</td><td><span class="st st-inactive">Inactivo</span></td>
+                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
+                </tr>
+                <tr>
+                  <td><div class="u-cell"><span class="avatar">CM</span> Carlos Mejía</div></td>
+                  <td>Administrador</td><td><span class="st st-active">Activo</span></td>
+                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="two-col" style="margin-top:0">
+            <div class="card card-pad">
+              <div class="card-title">Bitácora de actividad</div>
+              <div class="log">
+                <div class="log-item"><span class="dot"></span><div><div class="t">Emisión DTE Tipo 01 #001284</div><div class="ts">hace 2 min</div></div></div>
+                <div class="log-item"><span class="dot"></span><div><div class="t">Inicio de sesión — J. Hernández</div><div class="ts">hace 14 min</div></div></div>
+                <div class="log-item"><span class="dot"></span><div><div class="t">Reenvío contingencia #001190</div><div class="ts">hace 1 h</div></div></div>
+              </div>
+            </div>
+            <div class="card card-pad">
+              <div class="page-head" style="margin-bottom:12px"><div class="card-title" style="margin:0">Cola de contingencia</div><span class="st st-pending" id="cq-badge">— pendientes</span></div>
+              <p class="cont-note">DTE emitidos sin respuesta de MH. Se reportan con un evento de contingencia y luego se transmiten.</p>
+              <button class="btn btn-ghost btn-block" onclick="irAContingencia()">📡 Ir a contingencia</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contingencia (evento de contingencia, contingencia-schema-v4) -->
+        <div class="panel" id="a-contingencia" style="display:none">
+          <!-- C2: lote automático del cierre del día -->
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px;margin-bottom:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Lote automático (cierre del día)</h3><span id="lp-estado"></span></div>
+              <div class="filters"><button class="btn-mini" onclick="cargarContingencia()">↻ Actualizar</button></div>
+            </div>
+            <p class="cont-note">Todos los días, a la hora indicada, el sistema arma un <b>lote</b> con todos los DTE que sigan en contingencia: envía el <b>evento de contingencia</b> a MH y, si lo acepta, transmite los documentos en una <b>recepción por lote</b>. Los que no se puedan enviar quedan para el siguiente lote.</p>
+            <div class="lp-grid">
+              <label class="lp-switch"><input type="checkbox" id="lp-activo" onchange="this.dataset.dirty=1"> Envío automático activo</label>
+              <div class="field" style="margin:0"><label for="lp-hora">Hora del cierre</label><input type="time" id="lp-hora" step="60" oninput="this.dataset.dirty=1"></div>
+              <button class="btn btn-ghost solo-admin" id="lp-guardar" onclick="guardarProgramacion()">Guardar</button>
+            </div>
+            <div class="lp-info">
+              <div><span class="muted small">Próximo lote</span><b id="lp-proximo">—</b></div>
+              <div><span class="muted small">Último lote automático</span><b id="lp-ultimo">—</b></div>
+            </div>
+          </div>
+
+          <!-- C3: cola de consultas a MH -->
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px;margin-bottom:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Cola de consultas a MH</h3><span id="cm-estado"></span></div>
+            </div>
+            <p class="cont-note">Durante el día se pregunta a Hacienda, <b>un documento por turno</b> (para no saturar el servicio), si recibió cada DTE que quedó en contingencia. Si MH ya lo tenía (su respuesta se perdió), el DTE queda <b>Aceptado</b> con su sello original y sale de la cola; si no lo tiene, es una contingencia real y la reporta el lote.</p>
+            <div class="lp-grid">
+              <label class="lp-switch"><input type="checkbox" id="cm-activo" onchange="this.dataset.dirty=1"> Consultas automáticas activas</label>
+              <div class="field" style="margin:0"><label for="cm-intervalo">Un documento cada (segundos)</label><input type="number" id="cm-intervalo" min="10" max="3600" step="1" oninput="this.dataset.dirty=1"></div>
+              <button class="btn btn-ghost solo-admin" id="cm-guardar" onclick="guardarConsultas()">Guardar</button>
+            </div>
+            <div class="lp-info">
+              <div><span class="muted small">Próxima consulta</span><b id="cm-proxima">—</b></div>
+              <div><span class="muted small">Última consulta automática</span><b id="cm-ultima">—</b></div>
+            </div>
+          </div>
+
+          <!-- Cola de contingencia + lote manual -->
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">DTE en contingencia</h3><span class="muted small" id="ct-count"></span></div>
+            </div>
+            <p class="cont-note">Documentos que MH no recibió (modelo diferido, tipo de contingencia 1: MH no disponible). La cola de consultas los revisa uno a uno en MH; también puedes <b>consultar</b> o <b>reintentar</b> uno por uno, esperar el lote del cierre o <b>enviar un lote ahora</b> con todos los pendientes. MH pide reportarlos dentro de las 24 horas: los que llevan más tiempo se marcan en rojo.</p>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>Fecha</th><th>Número de control</th><th>Tipo</th><th>Receptor</th><th>En contingencia</th><th>Consulta MH</th><th class="num">Total</th><th class="num">Acciones</th></tr></thead>
+              <tbody id="ct-tbody"></tbody>
+            </table>
+            </div>
+            <div class="field" style="margin-top:16px">
+              <label for="ct-motivo">Motivo de la contingencia <span class="muted small">(opcional, máx. 500)</span></label>
+              <textarea id="ct-motivo" rows="2" maxlength="500" placeholder="Ej.: El servicio de recepción de MH no respondió"></textarea>
+            </div>
+            <div class="sim-mh" style="margin:0 0 14px">
+              <label for="ct-simular">Simular MH (lote, consultas y reintentos)</label>
+              <select id="ct-simular" class="pill">
+                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
+              </select>
+            </div>
+            <div class="form-actions" style="justify-content:flex-end">
+              <button class="btn btn-primary" id="ct-enviar" onclick="enviarLoteContingencia()">📦 Enviar lote ahora</button>
+            </div>
+          </div>
+
+          <!-- Lotes enviados -->
+          <div class="card card-pad">
+            <div class="page-head"><div><h3 style="display:inline-block;margin-right:8px">Lotes enviados</h3><span class="muted small" id="ce-count"></span></div></div>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>Fecha</th><th>Origen</th><th>Código de lote</th><th class="num">DTE</th><th>Período</th><th>Usuario</th><th>Evento MH</th><th class="num">Acciones</th></tr></thead>
+              <tbody id="ce-tbody"></tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bitácora (F4) -->
+        <div class="panel" id="a-bitacora" style="display:none">
+          <div class="card card-pad">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Bitácora de auditoría</h3><span class="muted small" id="b-count"></span></div>
+              <div class="filters" style="flex-wrap:wrap;justify-content:flex-end">
+                <select class="pill" id="b-accion" onchange="cargarBitacora()">
+                  <option value="">Todas las acciones</option>
+                  <option value="EMISION">Emisión DTE</option><option value="REINTENTO">Reintento</option><option value="INVALIDACION">Invalidación</option><option value="CONTINGENCIA">Evento de contingencia</option>
+                  <option value="LOGIN">Inicio de sesión</option><option value="LOGIN_FALLIDO">Login fallido</option>
+                  <option value="CREAR">Crear</option><option value="ACTUALIZAR">Actualizar</option>
+                </select>
+                <input type="text" class="pill" id="b-usuario" placeholder="Usuario" oninput="cargarBitacoraDiferido()" style="width:120px">
+                <input type="date" class="pill" id="b-desde" title="Desde" onchange="cargarBitacora()">
+                <input type="date" class="pill" id="b-hasta" title="Hasta" onchange="cargarBitacora()">
+                <button class="btn-mini" onclick="cargarBitacora()">↻ Actualizar</button>
+                <button class="btn-mini" onclick="exportarBitacoraCsv()">⬇ CSV</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>Fecha / hora</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Resultado</th><th>Detalle</th></tr></thead>
+              <tbody id="b-tbody"></tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración -->
+        <div class="panel" id="a-config" style="display:none">
+          <div class="card card-pad">
+            <div class="card-title">Datos del emisor</div>
+            <div class="form-grid">
+              <div class="field"><label>Nombre comercial</label><input value="Comercial Atlacatl, S.A. de C.V."></div>
+              <div class="field"><label>NIT</label><input value="0614-XXXXXX-XXX-X"></div>
+              <div class="field"><label>NRC</label><input value="123456-7"></div>
+              <div class="field"><label>Dirección</label><input value="Antiguo Cuscatlán, La Libertad"></div>
+            </div>
+            <div class="card-title" style="margin-top:22px">Certificado de firma electrónica</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+              <div><div style="font-weight:500">certificado_mh.crt</div><div class="muted small">Vigente · vence 12/2026</div></div>
+              <span class="st st-active">Habilitado</span>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-ghost" onclick="logout()">Cancelar</button>
+              <button class="btn btn-primary" onclick="toast('Configuración guardada')">Guardar cambios</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modal resultado de emisión (F3) -->
+<div class="modal-overlay" id="dte-result-modal" onclick="if(event.target===this)closeDteResult()">
+  <div class="modal dr-modal">
+    <div class="modal-head">
+      <h3 id="dr-title">Resultado del DTE</h3>
+      <button class="modal-x" onclick="closeDteResult()">✕</button>
+    </div>
+    <div class="dr-estado" id="dr-estado"></div>
+    <div class="dr-datos" id="dr-datos"></div>
+    <div class="dr-tabs">
+      <button id="dr-tab-json" class="active" onclick="drTab('json')">JSON DTE</button>
+      <button id="dr-tab-mh" onclick="drTab('mh')">Respuesta firmador / MH</button>
+      <button class="dr-copy" onclick="copiarDrActivo()">Copiar</button>
+    </div>
+    <pre class="dr-pre" id="dr-json"></pre>
+    <pre class="dr-pre" id="dr-mh" style="display:none"></pre>
+    <div class="form-actions" style="margin-top:14px;justify-content:space-between;align-items:center">
+      <div class="row-actions" id="dr-acciones"></div>
+      <button class="btn btn-primary" onclick="closeDteResult()">Listo</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal anular / invalidar (F4) -->
+<div class="modal-overlay" id="anular-modal" onclick="if(event.target===this)closeAnular()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h3>Anular DTE</h3>
+      <button class="modal-x" onclick="closeAnular()">✕</button>
+    </div>
+    <p class="muted small" style="margin-bottom:14px">Se enviará a MH un evento de invalidación (tipo 2) para <b id="an-doc" style="color:var(--ink)"></b>. Si MH lo acepta, el DTE pasa a <b>Anulado</b> y se devuelve el stock.</p>
+    <div class="field"><label>Motivo <span class="req">*</span></label><textarea id="an-motivo" maxlength="200" rows="3" placeholder="Ej. Error en la información del documento"></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeAnular()">Cancelar</button>
+      <button class="btn btn-danger" id="an-ok" onclick="confirmarAnular()">Anular documento</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal nota de crédito (F4) -->
+<div class="modal-overlay" id="nc-modal" onclick="if(event.target===this)closeNotaCredito()">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <h3>Nota de crédito · DTE 05</h3>
+      <button class="modal-x" onclick="closeNotaCredito()">✕</button>
+    </div>
+    <p class="muted small" style="margin-bottom:12px">Sobre el CCF <b id="nc-doc" style="color:var(--ink)"></b> · Receptor: <b id="nc-receptor" style="color:var(--ink)"></b>. Indica la cantidad a acreditar por línea (máximo la pendiente). El stock acreditado regresa al inventario.</p>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Código</th><th>Producto</th><th class="num">Cant. CCF</th><th class="num">Acreditada</th><th class="num">Pendiente</th><th class="num">P. unit.</th><th class="num">A acreditar</th></tr></thead>
+      <tbody id="nc-tbody"></tbody>
+    </table>
+    </div>
+    <p class="muted small" id="nc-sin-pendiente" style="display:none;margin-top:10px">Este CCF ya no tiene cantidades pendientes de acreditar.</p>
+    <div class="totals" style="max-width:280px;margin:14px 0 0 auto">
+      <div class="row"><span>Subtotal (sin IVA)</span><span id="nc-subtotal">$0.00</span></div>
+      <div class="row"><span>IVA (13%)</span><span id="nc-iva">$0.00</span></div>
+      <div class="row grand"><span>Total estimado</span><span id="nc-total">$0.00</span></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeNotaCredito()">Cancelar</button>
+      <button class="btn btn-primary" id="nc-ok" onclick="confirmarNotaCredito()">Emitir nota de crédito</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal enviar por correo -->
+<div class="modal-overlay" id="email-modal" onclick="if(event.target===this)closeEmailModal()">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <h3>Enviar por correo</h3>
+      <button class="modal-x" onclick="closeEmailModal()">✕</button>
+    </div>
+    <p class="muted small" style="margin-bottom:14px">Se enviará el DTE <span id="email-dte" style="font-weight:600;color:var(--ink)"></span> en formato PDF al correo indicado.</p>
+    <div class="field"><label>Correo electrónico</label><input type="email" id="email-input" placeholder="cliente@correo.com"></div>
+    <div class="form-actions" style="margin-top:10px;justify-content:space-between">
+      <button class="btn btn-soft" onclick="downloadPdf()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Descargar PDF</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="closeEmailModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="sendEmail()">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- toast + scrim -->
+<div class="scrim" id="scrim" onclick="closeSidebars()"></div>
+<div class="toast" id="toast"><span class="tick" id="toast-icon">✓</span><span id="toast-msg"></span></div>
+
+<script src="js/mocks.js"></script>
+<script src="js/api.js"></script>
+<script src="js/pdf-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
