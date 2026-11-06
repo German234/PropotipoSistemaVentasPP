@@ -18,7 +18,7 @@ Punto de venta académico que **simula** la facturación electrónica del Minist
 - Respuesta estándar: éxito `{ "ok": true, "data": ... }` · error `{ "ok": false, "error": { "codigo": "...", "mensaje": "..." } }`.
 - Ambiente MH: `"00"` (pruebas).
 - Autenticación: JWT en `Authorization: Bearer <token>` (todas las rutas excepto `POST /api/auth/login` y `GET /api/health`). Estructura: routes → controllers → services (SQL parametrizado vía `config/db.js`).
-- Header opcional `X-Simular: ok | rechazo | contingencia` (por defecto `ok`) fuerza el resultado de MH en la demo.
+- Header opcional `X-Simular: ok | rechazo | contingencia | timeout` (por defecto `ok`) fuerza el resultado de MH en la demo. `timeout` = MH recibió y selló el DTE pero la respuesta no llegó (el POS lo deja en CONTINGENCIA; la cola de consultas lo descubre).
 
 ## Reglas DTE
 

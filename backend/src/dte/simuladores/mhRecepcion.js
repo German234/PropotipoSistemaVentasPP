@@ -1,13 +1,17 @@
 /**
- * Recepción de MH simulada. El modo sale del header X-Simular: ok (defecto) | rechazo | contingencia.
+ * Recepción de MH simulada. El modo sale del header X-Simular: ok (defecto) | rechazo | contingencia | timeout.
  *   ok           → estado PROCESADO con selloRecibido (año + 36 alfanuméricos = 40 caracteres)
  *   rechazo      → estado RECHAZADO, selloRecibido null, observaciones con el motivo
  *   contingencia → MH no responde: devuelve null (el DTE queda en CONTINGENCIA y se puede reintentar)
+ *   timeout      → igual para el POS (null, CONTINGENCIA), pero MH SÍ recibió y selló el documento: dteService lo
+ *                  guarda en mh_simulado_dte y la cola de consultas (consultaMhService) lo descubre después.
  */
 const crypto = require('crypto');
 const { AppError } = require('../../utils/respuesta');
 
-const MODOS = ['ok', 'rechazo', 'contingencia'];
+const MODOS = ['ok', 'rechazo', 'contingencia', 'timeout'];
+/** El POS no recibe respuesta de MH (caído o respuesta perdida). */
+const sinRespuesta = (modo) => modo === 'contingencia' || modo === 'timeout';
 const ALFANUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 /** Modo de X-Simular (minúsculas). Valor desconocido → 400 VALIDACION. */
@@ -34,10 +38,10 @@ const fhProcesamiento = (d = new Date()) =>
 
 /**
  * Envía el DTE firmado al MH simulado.
- * @returns {object|null} respuesta MH, o null si el modo es contingencia (MH no respondió)
+ * @returns {object|null} respuesta MH, o null si el modo es contingencia o timeout (no llegó respuesta)
  */
 function recibir({ codigoGeneracion, versionApp = 2 }, modo = 'ok') {
-  if (modo === 'contingencia') return null;
+  if (sinRespuesta(modo)) return null;
   const ahora = new Date();
   const rechazo = modo === 'rechazo';
   return {
@@ -55,4 +59,4 @@ function recibir({ codigoGeneracion, versionApp = 2 }, modo = 'ok') {
   };
 }
 
-module.exports = { MODOS, leerModo, generarSello, fhProcesamiento, recibir };
+module.exports = { MODOS, sinRespuesta, leerModo, generarSello, fhProcesamiento, recibir };

@@ -1,5 +1,6 @@
 const service = require('../services/dteService');
 const consultas = require('../services/dteConsultasService');
+const consultaMh = require('../services/consultaMhService');
 const { leerModo } = require('../dte/simuladores/mhRecepcion');
 const { ok } = require('../utils/respuesta');
 const v = require('../utils/validar');
@@ -31,4 +32,8 @@ const listar = async (req, res) => {
 /** GET /api/dte/:id */
 const obtener = async (req, res) => ok(res, await consultas.obtener(v.id(req.params.id)));
 
-module.exports = { emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, invalidar, listar, obtener };
+/** POST /api/dte/:id/consultar — consulta de DTE en MH (cola de consultas, C3) */
+const consultar = async (req, res) =>
+  ok(res, await consultaMh.consultar(v.id(req.params.id), req.usuario, leerModo(req)));
+
+module.exports = { emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, consultar, invalidar, listar, obtener };

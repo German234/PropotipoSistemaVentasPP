@@ -49,7 +49,7 @@
     if(av){ av.textContent = iniciales(usuario.nombre); av.title = usuario.nombre+' ('+usuario.rol+')'; }
     limpiarFormProducto();
     show('app-vendedor'); setPanelById('vendedor','v-venta'); closeSidebars();
-    cargarProductos(); buscarClientes(); cargarClientesVenta();
+    cargarProductos(); buscarClientes(); cargarClientesVenta(); contarContingencia();
     ['v-simular','h-simular','ct-simular'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value='ok'; });
   }
 
@@ -58,7 +58,7 @@
     document.body.classList.remove('rol-admin');
     inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null;
     closeDteResult(); closeAnular(); closeNotaCredito();
-    dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; renderHistorial(); renderBitacora(); renderContingencia();
+    dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; ctProg = null; ctConsultas = null; actualizarColaContingencia(0); renderHistorial(); renderBitacora(); renderContingencia();
     var ctm = document.getElementById('ct-motivo'); if(ctm) ctm.value = '';
     renderInventory(); renderCatalog(''); renderCart(); renderClientes(); renderClientForm();
     show('login'); closeSidebars();
@@ -458,6 +458,8 @@
       if(det.eventoContingencia) extra += fila('Evento de contingencia',
         '<div style="display:flex;align-items:center;gap:8px"><a href="#" class="link mono-sm" onclick="verEventoContingencia('+det.eventoContingencia.id+');return false">'+
         _h(det.eventoContingencia.codigoGeneracion)+'</a>'+resultadoBadge(det.eventoContingencia.estado)+'</div>');
+      if(det.consultaMh) extra += fila('Consultas a MH', det.consultaMh.consultas+' · '+_h(RESULTADO_CONSULTA[det.consultaMh.resultado]||det.consultaMh.resultado||'—')+
+        ' <span class="muted">(última: '+fmtFechaHora(det.consultaMh.ultimaConsulta)+')</span>');
       if(inv) extra += fila('Invalidación', estadoBadge(inv.estado==='PROCESADO'?'INVALIDADO':'RECHAZADO')+' '+_h(inv.motivo||'')+
         (inv.selloRecibido?'<br><span class="mono">'+_h(inv.selloRecibido)+'</span>':' <span class="muted">(evento '+_h(inv.estado)+')</span>'));
     }
@@ -539,6 +541,7 @@
     var b = [];
     if(d.tipoDte==='03' && d.estado==='PROCESADO') b.push('<button class="btn-mini" onclick="abrirNotaCredito('+d.id+')">Nota de crédito</button>');
     if(d.estado==='PROCESADO') b.push('<button class="btn-mini danger" onclick="abrirAnular('+d.id+')">Anular</button>');
+    if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="consultarMhDte('+d.id+')" title="¿MH sí lo recibió?">Consultar MH</button>');
     if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="reintentarDte('+d.id+')">Reintentar envío</button>');
     return b.join('');
   }
@@ -580,7 +583,7 @@
   }
   /** Tras una operación: refresca listado y stock, y muestra el detalle actualizado */
   function trasOperacion(id){
-    cargarProductos();
+    cargarProductos(); contarContingencia();
     if(document.getElementById('v-historial').style.display!=='none') cargarHistorial();
     return id ? verDte(id) : null;
   }
@@ -677,97 +680,212 @@
     }).catch(alertaError).then(function(){ btn.disabled = false; });
   }
 
-  /* ===== Contingencia: evento de contingencia (POST/GET /api/contingencia) ===== */
-  var ctPendientes = [], ctEventos = [];
+  /* ===== Contingencia: lotes (evento de contingencia + recepción por lote) — C1/C2 ===== */
+  var ctPendientes = [], ctEventos = [], ctProg = null, ctConsultas = null;
   var TIPO_CONTINGENCIA = { 1:'No disponibilidad de sistema del MH', 2:'No disponibilidad de sistema del emisor',
     3:'Falla en el servicio de Internet del emisor', 4:'Falla en el suministro de energía eléctrica del emisor', 5:'Otro' };
-  /** Badge de la cola (Administración) y KPI del panel gerencial */
+  var ORIGEN_LOTE = { AUTOMATICO:'<span class="st st-draft">⏰ Automático</span>', MANUAL:'<span class="st st-active">✋ Manual</span>' };
+  var RESULTADO_LOTE = { PROCESADO:'Enviado', RECHAZADO:'Evento rechazado por MH', SIN_PENDIENTES:'Sin DTE pendientes',
+    SIN_RESPUESTA:'MH no respondió', ERROR:'Error' };
+  /** Badges de la cola: menú lateral (POS y Administración), tarjeta de Usuarios y KPI del panel gerencial */
   function actualizarColaContingencia(n){
     var b = document.getElementById('cq-badge'); if(b) b.textContent = n+' '+(n===1?'pendiente':'pendientes');
     var k = document.getElementById('kpi-contingencia'); if(k) k.textContent = n;
+    ['sb-ct-badge','sb-ct-badge-admin'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent = n>0 ? n : ''; });
   }
   function contarContingencia(){
     if(!esAdmin()) return Promise.resolve();
     return api.dte.listar({ estado:'CONTINGENCIA' }).then(function(l){ actualizarColaContingencia(l.length); }, function(){});
   }
   function irAContingencia(){ setPanelById('admin','a-contingencia'); }
-  function cargarContingencia(){
-    return Promise.all([api.dte.listar({ estado:'CONTINGENCIA' }), api.contingencia.listar()]).then(function(r){
+  function cargarContingencia(silencioso){
+    return Promise.all([api.dte.listar({ estado:'CONTINGENCIA' }), api.contingencia.listar(), api.contingencia.programacion(), api.contingencia.consultas()]).then(function(r){
       ctPendientes = r[0].slice().reverse(); // más antiguo primero (orden del detalleDTE)
       ctEventos = r[1];
+      ctProg = r[2];
+      ctConsultas = r[3];
       renderContingencia();
-    }).catch(alertaError);
+    }).catch(silencioso ? function(){} : alertaError);
+  }
+  /** Tiempo desde la emisión ("3 h 20 min"); más de 24 h = fuera del plazo para reportarlo */
+  function antiguedad(fecha){
+    var min = Math.max(0, Math.floor((Date.now() - new Date(fecha).getTime()) / 60000));
+    var txt = min < 60 ? min+' min' : Math.floor(min/60)+' h '+(min%60)+' min';
+    return min >= 1440 ? '<span class="ct-vencido" title="Más de 24 horas sin reportar">⚠ '+txt+'</span>' : txt;
+  }
+  function renderProgramacion(){
+    var p = ctProg;
+    document.getElementById('lp-estado').innerHTML = !p ? '' : p.activo
+      ? '<span class="st st-sealed">Activo · '+_h(p.hora)+'</span>' : '<span class="st st-draft">Desactivado</span>';
+    var act = document.getElementById('lp-activo'), hora = document.getElementById('lp-hora');
+    if(p){ if(!act.dataset.dirty) act.checked = p.activo; if(!hora.dataset.dirty && hora!==document.activeElement) hora.value = p.hora; }
+    act.disabled = hora.disabled = !esAdmin();
+    document.getElementById('lp-proximo').textContent = p && p.proximaEjecucion
+      ? fmtFechaHora(p.proximaEjecucion)+(ctPendientes.length ? ' · '+ctPendientes.length+' DTE en cola' : ' · sin DTE en cola')
+      : (p ? 'Envío automático desactivado' : '—');
+    var u = p && p.ultimaEjecucion;
+    document.getElementById('lp-ultimo').innerHTML = !u ? '<span class="muted">Aún no se ha ejecutado</span>'
+      : fmtFechaHora(u.fecha)+' · '+_h(RESULTADO_LOTE[u.resultado]||u.resultado)+
+        (u.cantidad ? ' ('+u.cantidad+' DTE)' : '')+
+        (u.eventoId ? ' · <a href="#" class="link" onclick="verEventoContingencia('+u.eventoId+');return false">Ver lote</a>' : '');
   }
   function renderContingencia(){
     var tb = document.getElementById('ct-tbody');
     if(!tb) return;
     if(ctPendientes.length===0){
-      tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="padding:22px"><div class="ic">✅</div>No hay DTE en contingencia</div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:22px"><div class="ic">✅</div>No hay DTE en contingencia</div></td></tr>';
     } else {
+      var enCola = {}; ((ctConsultas && ctConsultas.cola) || []).forEach(function(c){ enCola[c.id] = c; });
       tb.innerHTML = ctPendientes.map(function(d){
-        return '<tr><td><input type="checkbox" class="ct-chk" value="'+d.id+'" checked onchange="syncTodosContingencia()"></td>'+
-          '<td>'+fmtFechaHora(d.fechaEmision)+'</td>'+
+        return '<tr><td>'+fmtFechaHora(d.fechaEmision)+'</td>'+
           '<td><a href="#" class="link mono-sm" onclick="verDte('+d.id+');return false" title="Ver detalle">'+_h(d.numeroControl)+'</a></td>'+
           '<td>'+(TIPO_DTE[d.tipoDte]||d.tipoDte)+'</td><td>'+_h(d.receptor||'Consumidor final')+'</td>'+
-          '<td class="num">'+money(d.total)+'</td></tr>';
+          '<td>'+antiguedad(d.fechaEmision)+'</td>'+
+          '<td>'+celdaConsulta(enCola[d.id])+'</td>'+
+          '<td class="num">'+money(d.total)+'</td>'+
+          '<td class="num"><div class="row-actions"><button class="btn-mini" onclick="consultarMhDte('+d.id+',true)" title="Consultar en MH si sí lo recibió">Consultar</button>'+
+          '<button class="btn-mini" onclick="reintentarDesdeContingencia('+d.id+')" title="Reenviar solo este DTE">Reintentar</button></div></td></tr>';
       }).join('');
     }
-    var todos = document.getElementById('ct-todos');
-    todos.checked = ctPendientes.length>0; todos.disabled = ctPendientes.length===0;
-    document.getElementById('ct-enviar').disabled = ctPendientes.length===0;
+    var btn = document.getElementById('ct-enviar');
+    btn.disabled = ctPendientes.length===0;
+    btn.textContent = ctPendientes.length ? '📦 Enviar lote ahora ('+ctPendientes.length+' DTE)' : '📦 Enviar lote ahora';
     document.getElementById('ct-count').textContent = ctPendientes.length+' '+(ctPendientes.length===1?'documento':'documentos');
     actualizarColaContingencia(ctPendientes.length);
+    renderProgramacion();
+    renderConsultas();
 
     var te = document.getElementById('ce-tbody');
     te.innerHTML = ctEventos.length===0
-      ? '<tr><td colspan="7"><div class="empty" style="padding:22px">Aún no se ha enviado ningún evento</div></td></tr>'
+      ? '<tr><td colspan="8"><div class="empty" style="padding:22px">Aún no se ha enviado ningún lote</div></td></tr>'
       : ctEventos.map(function(e){
-          return '<tr><td>'+fmtFechaHora(e.fecha)+'</td><td class="mono-sm">'+_h(e.codigoGeneracion)+'</td><td class="num">'+e.cantidad+'</td>'+
+          return '<tr><td>'+fmtFechaHora(e.fecha)+'</td><td>'+(ORIGEN_LOTE[e.origen]||_h(e.origen||'MANUAL'))+'</td>'+
+            '<td class="mono-sm">'+(e.codigoLote ? _h(e.codigoLote) : '<span class="muted">— sin lote —</span>')+'</td><td class="num">'+e.cantidad+'</td>'+
             '<td class="small">'+fmtFechaHora(e.fInicio)+' – '+fmtFechaHora(e.fFin)+'</td><td>'+_h(e.usuario)+'</td>'+
             '<td>'+resultadoBadge(e.estado)+'</td>'+
             '<td class="num"><button class="btn-mini" onclick="verEventoContingencia('+e.id+')">Ver</button></td></tr>';
         }).join('');
-    document.getElementById('ce-count').textContent = ctEventos.length+' '+(ctEventos.length===1?'evento':'eventos');
+    document.getElementById('ce-count').textContent = ctEventos.length+' '+(ctEventos.length===1?'lote':'lotes');
   }
-  function seleccionContingencia(){
-    return [].slice.call(document.querySelectorAll('.ct-chk:checked')).map(function(c){ return Number(c.value); });
+  /* --- C3: cola de consultas a MH (un DTE por turno) --- */
+  var RESULTADO_CONSULTA = { ENCONTRADO:'Encontrado en MH', NO_ENCONTRADO:'No está en MH', SIN_RESPUESTA:'MH no respondió', ERROR:'Error' };
+  /** Celda "Consulta MH" de la cola: turno, veces consultado y último resultado */
+  function celdaConsulta(c){
+    if(!c) return '<span class="muted">—</span>';
+    var turno = c.posicion===1 ? '<span class="st st-pending">Siguiente</span>' : '<span class="muted">Turno '+c.posicion+'</span>';
+    var det = c.consultas
+      ? c.consultas+(c.consultas===1?' consulta':' consultas')+' · '+_h(RESULTADO_CONSULTA[c.resultado]||c.resultado||'')
+      : 'Sin consultar';
+    return '<div class="cm-cell">'+turno+'<br><span class="muted">'+det+'</span></div>';
   }
-  function marcarTodosContingencia(v){ document.querySelectorAll('.ct-chk').forEach(function(c){ c.checked = v; }); }
-  function syncTodosContingencia(){
-    var n = document.querySelectorAll('.ct-chk').length;
-    document.getElementById('ct-todos').checked = n>0 && seleccionContingencia().length===n;
+  function renderConsultas(){
+    var c = ctConsultas;
+    document.getElementById('cm-estado').innerHTML = !c ? '' : c.activo
+      ? '<span class="st st-sealed">Activa · cada '+c.intervaloSeg+' s</span>' : '<span class="st st-draft">Desactivada</span>';
+    var act = document.getElementById('cm-activo'), iv = document.getElementById('cm-intervalo');
+    if(c){ if(!act.dataset.dirty) act.checked = c.activo; if(!iv.dataset.dirty && iv!==document.activeElement) iv.value = c.intervaloSeg; }
+    act.disabled = iv.disabled = !esAdmin();
+    var prox = '—';
+    if(c && !c.activo) prox = 'Consultas automáticas desactivadas';
+    else if(c && c.proximaConsulta){
+      var seg = Math.max(0, Math.round((new Date(c.proximaConsulta).getTime() - Date.now())/1000));
+      var sig = c.cola && c.cola[0];
+      prox = (sig ? _h(sig.numeroControl) : 'Sin DTE en cola')+' · en '+(seg < 120 ? seg+' s' : Math.round(seg/60)+' min');
+    }
+    document.getElementById('cm-proxima').innerHTML = prox;
+    var u = c && c.ultimaConsulta;
+    document.getElementById('cm-ultima').innerHTML = !u ? '<span class="muted">Aún no hay consultas automáticas</span>'
+      : fmtFechaHora(u.fecha)+' · '+(u.dteId ? '<a href="#" class="link mono-sm" onclick="verDte('+u.dteId+');return false">'+_h(u.numeroControl)+'</a> → ' : '')+
+        _h(RESULTADO_CONSULTA[u.resultado]||u.resultado);
   }
-  function enviarEventoContingencia(){
-    var ids = seleccionContingencia();
-    if(ids.length===0){ toast('Selecciona al menos un DTE','warn'); return; }
+  function guardarConsultas(){
+    var iv = Number(document.getElementById('cm-intervalo').value);
+    if(!(iv>=10 && iv<=3600 && iv%1===0)){ toast('El intervalo debe ser un entero entre 10 y 3600 segundos','warn'); return; }
+    var btn = document.getElementById('cm-guardar'); btn.disabled = true;
+    api.contingencia.configurarConsultas({ activo: document.getElementById('cm-activo').checked, intervaloSeg: iv }).then(function(c){
+      delete document.getElementById('cm-activo').dataset.dirty; delete document.getElementById('cm-intervalo').dataset.dirty;
+      ctConsultas = c; renderConsultas();
+      toast(c.activo ? 'Cola de consultas: un documento cada '+c.intervaloSeg+' s' : 'Cola de consultas desactivada');
+    }).catch(alertaError).then(function(){ btn.disabled = false; });
+  }
+  /** Consulta puntual en MH. desdePanel: refresca el panel de contingencia; si no, abre el detalle (Transacciones). */
+  function consultarMhDte(id, desdePanel){
+    var sim = simularDe(desdePanel ? 'ct-simular' : 'h-simular');
+    toast('Consultando el documento en MH...');
+    api.dte.consultar(id, sim).then(function(r){
+      toast(r.resultado==='ENCONTRADO' ? 'MH sí lo había recibido · DTE aceptado con su sello' :
+            r.resultado==='NO_ENCONTRADO' ? 'MH no tiene el documento: es una contingencia real' : 'MH no respondió a la consulta',
+            r.resultado==='ENCONTRADO' ? undefined : 'warn');
+      if(desdePanel){ contarContingencia(); return cargarContingencia(); }
+      return trasOperacion(id);
+    }).catch(function(e){
+      // p. ej. 409: la cola automática ya lo resolvió → refrescar para no mostrar datos viejos
+      alertaError(e);
+      return desdePanel ? cargarContingencia(true) : trasOperacion(null);
+    });
+  }
+  /** Mientras el panel de contingencia está abierto se refresca solo (la cola y el lote corren en el servidor) */
+  setInterval(function(){
+    if(!usuarioActual || !esAdmin()) return;
+    var panel = document.getElementById('a-contingencia');
+    var visible = panel && panel.style.display!=='none' && document.getElementById('app-admin').classList.contains('active');
+    if(visible && !document.getElementById('dte-result-modal').classList.contains('show')) cargarContingencia(true);
+    else if(!visible) contarContingencia();
+  }, 10000);
+  function guardarProgramacion(){
+    var hora = document.getElementById('lp-hora').value;
+    if(!/^\d{2}:\d{2}$/.test(hora)){ toast('Indica la hora del cierre (HH:mm)','warn'); return; }
+    var btn = document.getElementById('lp-guardar'); btn.disabled = true;
+    api.contingencia.programar({ activo: document.getElementById('lp-activo').checked, hora: hora }).then(function(p){
+      delete document.getElementById('lp-activo').dataset.dirty; delete document.getElementById('lp-hora').dataset.dirty;
+      ctProg = p; renderProgramacion();
+      toast(p.activo ? 'Lote automático programado a las '+p.hora : 'Lote automático desactivado');
+    }).catch(alertaError).then(function(){ btn.disabled = false; });
+  }
+  /** Lote manual: evento de contingencia con TODOS los DTE pendientes en este momento → recepción por lote */
+  function enviarLoteContingencia(){
+    if(ctPendientes.length===0){ toast('No hay DTE en contingencia','warn'); return; }
     var motivo = document.getElementById('ct-motivo').value.trim();
-    var body = { dteIds: ids }; if(motivo) body.motivo = motivo;
+    var body = {}; if(motivo) body.motivo = motivo;
     var btn = document.getElementById('ct-enviar');
-    btn.disabled = true; btn.textContent = 'Enviando evento a MH...';
+    btn.disabled = true; btn.textContent = 'Enviando lote a MH...';
     api.contingencia.enviar(body, simularDe('ct-simular')).then(function(ev){
       if(ev.estado==='PROCESADO'){
         var ok = ev.dtes.filter(function(d){ return d.estado==='PROCESADO'; }).length;
-        toast('Evento aceptado · '+ok+' de '+ev.cantidad+' DTE transmitidos y sellados');
+        toast('Lote enviado · '+ok+' de '+ev.cantidad+' DTE transmitidos y sellados');
       } else toast('MH rechazó el evento; los DTE siguen en contingencia','warn');
       document.getElementById('ct-motivo').value = '';
       return cargarContingencia().then(function(){ mostrarEventoContingencia(ev); });
-    }).catch(function(e){ alertaError(e); return cargarContingencia(); })
-      .then(function(){ btn.textContent = '📡 Enviar evento y transmitir'; btn.disabled = ctPendientes.length===0; });
+    }).catch(function(e){ alertaError(e); return cargarContingencia(); });
+  }
+  /** Reintento individual desde la cola (POST /api/dte/:id/reintentar) */
+  function reintentarDesdeContingencia(id){
+    api.dte.reintentar(id, simularDe('ct-simular')).then(function(r){
+      toast(r.estado==='PROCESADO' ? 'DTE procesado · sello recibido' :
+            r.estado==='CONTINGENCIA' ? 'MH sigue sin responder; queda en contingencia' : 'MH rechazó el documento',
+            r.estado==='PROCESADO' ? undefined : 'warn');
+      cargarProductos();
+      return cargarContingencia();
+    }).catch(function(e){ alertaError(e); return cargarContingencia(true); });
   }
   function verEventoContingencia(id){
     return api.contingencia.obtener(id).then(mostrarEventoContingencia).catch(alertaError);
   }
-  /** Detalle del evento en el modal de resultado (pestañas: JSON del evento / firmador + MH) */
+  /** Detalle del lote en el modal de resultado (pestañas: JSON del evento / firmador + MH + lote) */
   function mostrarEventoContingencia(ev){
     var acept = ev.estado==='PROCESADO';
     function fila(k, v, mono){ return '<div class="dr-row"><span>'+k+'</span><b'+(mono?' class="mono"':'')+'>'+v+'</b></div>'; }
-    document.getElementById('dr-title').textContent = 'Evento de contingencia';
+    document.getElementById('dr-title').textContent = 'Lote de contingencia';
     document.getElementById('dr-estado').innerHTML = '<span class="dr-badge dr-'+(acept?'ok':'err')+'">'+_h(ev.estado)+'</span>'+
-      '<span class="muted small">'+(acept ? 'MH aceptó el evento; sus DTE se transmitieron' : 'MH rechazó el evento; los DTE siguen en contingencia')+'</span>';
+      (ORIGEN_LOTE[ev.origen]||'')+
+      '<span class="muted small">'+(acept ? 'MH aceptó el evento y recibió el lote de DTE' : 'MH rechazó el evento; los DTE siguen en contingencia')+'</span>';
     var obs = (ev.respuestaMh && ev.respuestaMh.observaciones) || [];
+    var lote = ev.lote;
     document.getElementById('dr-datos').innerHTML =
-      fila('Código de generación', _h(ev.codigoGeneracion), true) +
-      fila('Sello recibido', ev.selloRecibido ? _h(ev.selloRecibido) : '<span class="muted">— sin sello —</span>', true) +
+      fila('Código de generación (evento)', _h(ev.codigoGeneracion), true) +
+      fila('Sello del evento', ev.selloRecibido ? _h(ev.selloRecibido) : '<span class="muted">— sin sello —</span>', true) +
+      fila('Código de lote', lote ? _h(lote.codigoLote) : '<span class="muted">— no se envió lote —</span>', true) +
+      (lote ? fila('Resultado del lote', lote.procesados+' procesados · '+lote.rechazados+' rechazados') : '') +
       fila('Fecha de envío', fmtFechaHora(ev.fecha)) +
       fila('Período de contingencia', fmtFechaHora(ev.fInicio)+' – '+fmtFechaHora(ev.fFin)) +
       fila('Tipo de contingencia', ev.tipoContingencia+' · '+_h(TIPO_CONTINGENCIA[ev.tipoContingencia]||'')) +
@@ -781,7 +899,10 @@
       }).join(''));
     document.getElementById('dr-tab-json').textContent = 'JSON evento';
     document.getElementById('dr-json').textContent = JSON.stringify(ev.jsonEvento, null, 2);
-    document.getElementById('dr-mh').textContent = JSON.stringify({ firmador:ev.firmador, respuestaMh:ev.respuestaMh }, null, 2);
+    document.getElementById('dr-mh').textContent = JSON.stringify({
+      firmador: ev.firmador, respuestaMh: ev.respuestaMh,
+      lote: lote ? { jsonLote: lote.jsonLote, respuestaMh: lote.respuestaMh } : null
+    }, null, 2);
     document.getElementById('dr-acciones').innerHTML = '';
     drTab('json');
     document.getElementById('dte-result-modal').classList.add('show');

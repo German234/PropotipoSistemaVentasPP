@@ -2,12 +2,12 @@
  * Recepción de eventos de invalidación del MH (simulada). Modo de X-Simular:
  *   ok           → PROCESADO con sello propio del evento (40 caracteres)
  *   rechazo      → RECHAZADO, sin sello (el DTE sigue PROCESADO)
- *   contingencia → MH no responde: null (no existe contingencia para eventos; se reintenta la invalidación)
+ *   contingencia / timeout → MH no responde: null (no existe contingencia para eventos; se reintenta la invalidación)
  */
-const { generarSello, fhProcesamiento } = require('./mhRecepcion');
+const { generarSello, fhProcesamiento, sinRespuesta } = require('./mhRecepcion');
 
 function anular({ codigoGeneracion }, modo = 'ok') {
-  if (modo === 'contingencia') return null;
+  if (sinRespuesta(modo)) return null;
   const ahora = new Date();
   const rechazo = modo === 'rechazo';
   return {

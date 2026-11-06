@@ -94,6 +94,9 @@ var MockApi = (function () {
     dte: [],          // registro interno (ver guardarDte)
     eventos: [],      // invalidaciones
     eventosCont: [],  // eventos de contingencia
+    programacion: { activo: true, hora: '23:55', ultimaEjecucion: null },
+    mhRegistro: {},   // C3: lo que MH "recibió" en un timeout, por codigoGeneracion { jsonDte, firmador, respuestaMh }
+    consultas: { activo: true, intervaloSeg: 60, ultimaConsulta: null, proxima: null, timer: null },  // C3: cola de consultas  // C2: lote automático (sin temporizador en el mock)
     bitacora: [],
     seq: { producto: 10, cliente: 4, dte: 0, evento: 0, eventoCont: 0, bitacora: 0 }
   };
@@ -143,7 +146,7 @@ var MockApi = (function () {
   }
   function modoSimular(headers) {
     var m = String(headers['X-Simular'] || headers['x-simular'] || 'ok').trim().toLowerCase();
-    if (['ok', 'rechazo', 'contingencia'].indexOf(m) === -1) err('VALIDACION', 'X-Simular debe ser ok | rechazo | contingencia');
+    if (['ok', 'rechazo', 'contingencia', 'timeout'].indexOf(m) === -1) err('VALIDACION', 'X-Simular debe ser ok | rechazo | contingencia | timeout');
     return m;
   }
 
@@ -199,8 +202,10 @@ var MockApi = (function () {
     var firma = btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return { status: 'OK', body: b64url(JSON.stringify({ alg: 'RS512', typ: 'JWS' })) + '.' + b64url(JSON.stringify(json)) + '.' + firma };
   }
+  /** C3: contingencia = MH caído; timeout = MH recibió pero la respuesta se perdió. En ambos el POS no recibe nada. */
+  function sinRespuesta(modo) { return modo === 'contingencia' || modo === 'timeout'; }
   function respuestaMh(codigoGeneracion, modo, evento) {
-    if (modo === 'contingencia') return null;
+    if (sinRespuesta(modo)) return null;
     var ahora = new Date(), rech = modo === 'rechazo';
     return {
       version: 2, ambiente: '00', versionApp: 2, estado: rech ? 'RECHAZADO' : 'PROCESADO', codigoGeneracion: codigoGeneracion,
@@ -363,6 +368,7 @@ var MockApi = (function () {
   /* ---------- guardar + respuesta de emisión ---------- */
   function guardarDte(x, modo) {
     var mh = respuestaMh(x.jsonDte.identificacion.codigoGeneracion, modo);
+    if (modo === 'timeout') registrarEnMh(x.jsonDte.identificacion.codigoGeneracion, clone(x.jsonDte), firmar(x.jsonDte));
     if (!mh) {  // MH no respondió: el DTE se emite en contingencia (modelo diferido) antes de firmarse
       var idf = x.jsonDte.identificacion;
       idf.tipoModelo = 2; idf.tipoOperacion = 2; idf.tipoContingencia = 1; idf.motivoContin = null;
@@ -390,7 +396,26 @@ var MockApi = (function () {
   }
 
   /* ---------- reintentar / invalidar ---------- */
+  function registrarEnMh(cod, jsonDte, firmador) {
+    if (!db.mhRegistro[cod]) db.mhRegistro[cod] = { jsonDte: jsonDte, firmador: firmador, respuestaMh: respuestaMh(cod, 'ok') };
+    return db.mhRegistro[cod];
+  }
+  /** MH ya tenía el documento: PROCESADO con el sello original y el JSON/firma que MH recibió */
+  function aplicarRegistroMh(d, reg, mh) {
+    d.estado = 'PROCESADO'; d.selloRecibido = reg.respuestaMh.selloRecibido; d.respuestaMh = mh;
+    d.jsonDte = clone(reg.jsonDte); d.firmador = clone(reg.firmador);
+  }
   function transmitir(d, u, modo, codEvento) {
+    var reg = sinRespuesta(modo) ? null : db.mhRegistro[d.codigoGeneracion];
+    if (reg) {
+      aplicarRegistroMh(d, reg, Object.assign({}, reg.respuestaMh, { observaciones: ['MH ya había recibido este documento; se devuelve el sello original (simulado)'] }));
+      var dr = { tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: 'PROCESADO',
+        mensaje: 'DTE-' + d.tipoDte + ' ya estaba en MH (simulado): se recupera el sello original' };
+      if (codEvento) dr.codigoGeneracionEvento = codEvento;
+      bitacora(u.usuario, 'REINTENTO', 'dte', d.id, dr.mensaje, dr, { codigoGeneracion: d.codigoGeneracion, resultado: 'PROCESADO' });
+      return;
+    }
+    if (modo === 'timeout') registrarEnMh(d.codigoGeneracion, clone(d.jsonDte), clone(d.firmador));
     var mh = respuestaMh(d.codigoGeneracion, modo);
     if (mh) {
       d.respuestaMh = mh; d.estado = mh.estado; d.selloRecibido = mh.selloRecibido;
@@ -416,10 +441,12 @@ var MockApi = (function () {
   }
   function eventoContOut(ev, completo) {
     var o = { id: ev.id, codigoGeneracion: ev.codigoGeneracion, estado: ev.estado, selloRecibido: ev.selloRecibido, fecha: ev.fecha,
-      fInicio: ev.fInicio, fFin: ev.fFin, tipoContingencia: 1, motivo: ev.motivo, usuario: ev.usuario, cantidad: ev.dteIds.length };
+      fInicio: ev.fInicio, fFin: ev.fFin, tipoContingencia: 1, motivo: ev.motivo, usuario: ev.usuario,
+      origen: ev.origen || 'MANUAL', codigoLote: ev.lote ? ev.lote.codigoLote : null, cantidad: ev.dteIds.length };
     if (completo) {
       o.dtes = ev.dteIds.map(function (id) { return contDteOut(porId(db.dte, id, 'DTE')); });
       o.jsonEvento = clone(ev.jsonEvento); o.firmador = clone(ev.firmador); o.respuestaMh = clone(ev.respuestaMh);
+      o.lote = clone(ev.lote || null);
     }
     return o;
   }
@@ -459,12 +486,117 @@ var MockApi = (function () {
       err('MH_NO_DISPONIBLE', 'MH no respondió al evento de contingencia (simulado). Los DTE siguen en contingencia; intente de nuevo.');
     }
     var ev = { id: ++db.seq.eventoCont, codigoGeneracion: cod, estado: mh.estado, selloRecibido: mh.selloRecibido, fecha: fin,
-      fInicio: inicio, fFin: fin, motivo: motivo, usuario: u.usuario, dteIds: resumen.dteIds, jsonEvento: jsonEvento, firmador: firmador, respuestaMh: mh };
+      fInicio: inicio, fFin: fin, motivo: motivo, usuario: u.usuario, origen: 'MANUAL', lote: null,
+      dteIds: resumen.dteIds, jsonEvento: jsonEvento, firmador: firmador, respuestaMh: mh };
     db.eventosCont.push(ev);
     var msg = 'Evento de contingencia con ' + lista.length + ' DTE (simulado): ' + mh.descripcionMsg;
     bitacora(u.usuario, 'CONTINGENCIA', 'evento_contingencia', ev.id, msg, Object.assign({}, resumen, { resultado: mh.estado, mensaje: msg }), { resultado: mh.estado });
-    if (mh.estado === 'PROCESADO') lista.forEach(function (d) { transmitir(d, u, 'ok', cod); });
-    return { status: 201, data: eventoContOut(ev, true) };
+    if (mh.estado === 'PROCESADO') {
+      // C2: recepción por lote de los DTE firmados
+      var jsonLote = { ambiente: '00', idEnvio: uuid(), version: 2, nitEmisor: e.nit,
+        documentos: lista.map(function (d) { return (d.firmador || {}).body || null; }) };
+      var respLote = { version: 2, ambiente: '00', versionApp: 2, estado: 'RECIBIDO', idEnvio: jsonLote.idEnvio,
+        fhProcesamiento: fhProcesamiento(new Date()), codigoLote: uuid(), codigoMsg: '001',
+        descripcionMsg: 'LOTE RECIBIDO, VALIDADO PROCESAMIENTO EN COLA (SIMULADO)' };
+      lista.forEach(function (d) { transmitir(d, u, 'ok', cod); });
+      ev.lote = { codigoLote: respLote.codigoLote, idEnvio: jsonLote.idEnvio,
+        procesados: lista.filter(function (d) { return d.estado === 'PROCESADO'; }).length,
+        rechazados: lista.filter(function (d) { return d.estado === 'RECHAZADO'; }).length,
+        jsonLote: jsonLote, respuestaMh: respLote };
+    }
+    var out = eventoContOut(ev, true); out.lote = clone(ev.lote);
+    return { status: 201, data: out };
+  }
+
+  /* ---------- C3: cola de consultas a MH (1 DTE por turno, round-robin) ---------- */
+  function consultarEnMh(d, u, modo, origen) {
+    if (d.estado !== 'CONTINGENCIA') err('ESTADO_INVALIDO', 'Solo se consultan en MH los DTE en CONTINGENCIA; ' + d.numeroControl + ' está en ' + d.estado);
+    var reg = db.mhRegistro[d.codigoGeneracion], mh = null, resultado = 'SIN_RESPUESTA';
+    if (!sinRespuesta(modo)) {
+      if (reg) {
+        mh = Object.assign({}, reg.respuestaMh, { descripcionMsg: 'DOCUMENTO ENCONTRADO: RECIBIDO Y PROCESADO' });
+        resultado = 'ENCONTRADO'; aplicarRegistroMh(d, reg, mh);
+      } else {
+        mh = { version: 2, ambiente: '00', versionApp: 2, estado: null, codigoGeneracion: d.codigoGeneracion, selloRecibido: null,
+          fhProcesamiento: fhProcesamiento(new Date()), clasificaMsg: '99', codigoMsg: '004', descripcionMsg: 'DOCUMENTO NO ENCONTRADO (SIMULADO)', observaciones: [] };
+        resultado = 'NO_ENCONTRADO';
+      }
+    }
+    d.consultasMh = (d.consultasMh || 0) + 1; d.ultimaConsultaMh = Date.now(); d.resultadoConsultaMh = resultado;
+    if (resultado === 'ENCONTRADO' || origen === 'MANUAL') {
+      var msg = resultado === 'ENCONTRADO' ? 'Consulta a MH (simulado): DTE-' + d.tipoDte + ' sí estaba recibido; queda PROCESADO con su sello'
+        : resultado === 'NO_ENCONTRADO' ? 'Consulta a MH (simulado): DTE-' + d.tipoDte + ' no está en MH; sigue en contingencia' : 'Consulta a MH (simulado): MH no respondió';
+      var res = resultado === 'ENCONTRADO' ? 'PROCESADO' : resultado;
+      bitacora(u.usuario, 'CONSULTA_MH', 'dte', d.id, msg, { tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion,
+        origen: origen, resultado: res, mensaje: msg }, { codigoGeneracion: d.codigoGeneracion, resultado: res });
+    }
+    return { dteId: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: resultado,
+      estado: d.estado, selloRecibido: d.estado === 'PROCESADO' ? d.selloRecibido : null, consultas: d.consultasMh,
+      fecha: isoLocal(new Date()), origen: origen, respuestaMh: clone(mh) };
+  }
+  function colaConsultas() {
+    return db.dte.filter(function (d) { return d.estado === 'CONTINGENCIA'; }).sort(function (a, b) {
+      var x = a.ultimaConsultaMh || 0, y = b.ultimaConsultaMh || 0;
+      return x !== y ? x - y : a.id - b.id;
+    });
+  }
+  function consultarSiguiente() {
+    var d = colaConsultas()[0];
+    if (!d) return null;
+    var r = consultarEnMh(d, { usuario: 'admin' }, 'ok', 'AUTOMATICO');
+    db.consultas.ultimaConsulta = Object.assign({}, r, { respuestaMh: undefined });
+    return r;
+  }
+  function programarConsultas() {
+    var c = db.consultas;
+    clearTimeout(c.timer); c.timer = null; c.proxima = null;
+    if (!c.activo) return;
+    c.proxima = new Date(Date.now() + c.intervaloSeg * 1000);
+    c.timer = setTimeout(function () { consultarSiguiente(); programarConsultas(); }, c.intervaloSeg * 1000);
+  }
+  function consultasOut() {
+    var c = db.consultas;
+    return { activo: c.activo, intervaloSeg: c.intervaloSeg, proximaConsulta: c.proxima ? isoLocal(c.proxima) : null,
+      ultimaConsulta: clone(c.ultimaConsulta || null),
+      cola: colaConsultas().map(function (d, i) {
+        return { posicion: i + 1, id: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, consultas: d.consultasMh || 0,
+          ultimaConsulta: d.ultimaConsultaMh ? isoLocal(new Date(d.ultimaConsultaMh)) : null, resultado: d.resultadoConsultaMh || null };
+      }) };
+  }
+  function configurarConsultas(body, u) {
+    requireAdmin(u);
+    var b = body || {};
+    if (b.activo === undefined && b.intervaloSeg === undefined) err('VALIDACION', 'Envíe activo y/o intervaloSeg');
+    if (b.activo !== undefined && typeof b.activo !== 'boolean') err('VALIDACION', 'activo debe ser true o false');
+    if (b.intervaloSeg !== undefined && (typeof b.intervaloSeg !== 'number' || b.intervaloSeg % 1 !== 0 || b.intervaloSeg < 10 || b.intervaloSeg > 3600))
+      err('VALIDACION', 'intervaloSeg debe ser un entero entre 10 y 3600');
+    if (b.activo !== undefined) db.consultas.activo = b.activo;
+    if (b.intervaloSeg !== undefined) db.consultas.intervaloSeg = b.intervaloSeg;
+    programarConsultas();
+    return consultasOut();
+  }
+
+  /* ---------- C2: programación del lote automático ---------- */
+  function programacionOut() {
+    var p = db.programacion, prox = null;
+    if (p.activo) {
+      var hm = p.hora.split(':'), ahora = new Date(), d = new Date(ahora);
+      d.setHours(Number(hm[0]), Number(hm[1]), 0, 0);
+      if (d <= ahora) d.setDate(d.getDate() + 1);
+      prox = isoLocal(d);
+    }
+    return { activo: p.activo, hora: p.hora, proximaEjecucion: prox, ultimaEjecucion: clone(p.ultimaEjecucion),
+      pendientes: db.dte.filter(function (x) { return x.estado === 'CONTINGENCIA'; }).length };
+  }
+  function programar(body, u) {
+    requireAdmin(u);
+    var b = body || {};
+    if (b.activo === undefined && b.hora === undefined) err('VALIDACION', 'Envíe activo y/o hora');
+    if (b.activo !== undefined && typeof b.activo !== 'boolean') err('VALIDACION', 'activo debe ser true o false');
+    if (b.hora !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(b.hora)) err('VALIDACION', 'hora debe tener el formato HH:mm (00:00 a 23:59)');
+    if (b.activo !== undefined) db.programacion.activo = b.activo;
+    if (b.hora !== undefined) db.programacion.hora = b.hora;
+    return programacionOut();
   }
 
   function invalidar(id, body, u, modo) {
@@ -551,6 +683,7 @@ var MockApi = (function () {
       fecha: ev.fecha, usuario: ev.usuario, selloRecibido: ev.selloRecibido, jsonEvento: clone(ev.jsonEvento), firmador: clone(ev.firmador),
       respuestaMh: clone(ev.respuestaMh) } : null;
     var ecs = db.eventosCont.filter(function (x) { return x.dteIds.indexOf(d.id) !== -1; }), ec = ecs[ecs.length - 1];
+    o.consultaMh = d.consultasMh ? { consultas: d.consultasMh, ultimaConsulta: isoLocal(new Date(d.ultimaConsultaMh)), resultado: d.resultadoConsultaMh } : null;
     o.eventoContingencia = ec ? { id: ec.id, codigoGeneracion: ec.codigoGeneracion, estado: ec.estado, selloRecibido: ec.selloRecibido, fecha: ec.fecha } : null;
     return o;
   }
@@ -627,6 +760,11 @@ var MockApi = (function () {
     if (method === 'GET' && (m = /^\/dte\/(\d+)$/.exec(path))) return obtenerDte(m[1]);
     if (method === 'GET' && path === '/bitacora') return listarBitacora(query);
     if (method === 'POST' && path === '/contingencia') return enviarContingencia(body, u, modoSimular(headers));
+    if (method === 'GET' && path === '/contingencia/programacion') return programacionOut();
+    if (method === 'GET' && path === '/contingencia/consultas') return consultasOut();
+    if (method === 'PUT' && path === '/contingencia/consultas') return configurarConsultas(body, u);
+    if (method === 'POST' && (m = /^\/dte\/(\d+)\/consultar$/.exec(path))) return consultarEnMh(porId(db.dte, m[1], 'DTE'), u, modoSimular(headers), 'MANUAL');
+    if (method === 'PUT' && path === '/contingencia/programacion') return programar(body, u);
     if (method === 'GET' && path === '/contingencia') return db.eventosCont.slice().reverse().map(function (e) { return eventoContOut(e, false); });
     if (method === 'GET' && (m = /^\/contingencia\/(\d+)$/.exec(path))) return eventoContOut(porId(db.eventosCont, m[1], 'Evento de contingencia'), true);
 
@@ -638,6 +776,7 @@ var MockApi = (function () {
    * @returns {{status:number, body:object}} misma forma que la respuesta HTTP del backend
    */
   function handle(method, path, query, body, headers) {
+    if (!db.consultas.iniciada) { db.consultas.iniciada = true; programarConsultas(); }  // C3: la cola corre solo en modo mock
     try {
       var r = route(method.toUpperCase(), path, query || {}, body || {}, headers || {});
       if (r && typeof r.status === 'number' && 'data' in r) return { status: r.status, body: { ok: true, data: r.data } };

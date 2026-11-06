@@ -84,7 +84,8 @@ async function obtener(id) {
             d.subtotal, d.iva, d.total, d.json_dte AS jsonDte, d.firma, d.respuesta_mh AS respuestaMh,
             d.dte_relacionado_id AS dteRelacionadoId, d.cliente_id AS clienteId, c.nombre AS clienteNombre, c.tipo AS clienteTipo,
             u.usuario, rel.numero_control AS relNumeroControl, rel.codigo_generacion AS relCodigoGeneracion,
-            rel.tipo_dte AS relTipoDte, rel.estado AS relEstado
+            rel.tipo_dte AS relTipoDte, rel.estado AS relEstado,
+            d.consultas_mh AS consultasMh, d.ultima_consulta_mh AS ultimaConsultaMh, d.resultado_consulta_mh AS resultadoConsultaMh
      FROM dbo.dte d
      JOIN dbo.usuarios u ON u.id = d.usuario_id
      LEFT JOIN dbo.clientes c ON c.id = d.cliente_id
@@ -139,6 +140,10 @@ async function obtener(id) {
     notasCredito: nc,
     invalidacion: await ultimoEvento(id),
     eventoContingencia: await ultimoDeDte(id),
+    // C3: cola de consultas a MH (null si nunca se consultó)
+    consultaMh: d.consultasMh
+      ? { consultas: d.consultasMh, ultimaConsulta: fechaIso(d.ultimaConsultaMh), resultado: d.resultadoConsultaMh }
+      : null,
   };
 }
 

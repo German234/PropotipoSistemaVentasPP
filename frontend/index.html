@@ -280,6 +280,21 @@
   .modal.dr-modal{max-width:760px}
   /* F4: transacciones, NC, anular, bitácora */
   .st-rejected{background:transparent;color:var(--danger);border:1px solid #f0c9ce}
+  /* C2: lote de contingencia */
+  .lp-grid{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .lp-grid .field input[type=time]{width:140px}
+  .lp-grid .field input[type=number]{width:130px}
+  .cm-cell{font-size:12.5px;line-height:1.5;white-space:nowrap}
+  #ct-tbody .btn-mini,#ct-tbody td:first-child{white-space:nowrap}
+  #ct-tbody .row-actions{flex-direction:column;align-items:stretch;gap:4px}
+  .lp-switch{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;padding-bottom:10px;cursor:pointer}
+  .lp-switch input{width:16px;height:16px}
+  .lp-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .lp-info > div{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13.5px}
+  .ct-vencido{color:var(--danger);font-weight:600}
+  #ce-tbody .st,.dr-estado .st{white-space:nowrap}
+  .nav-count{margin-left:auto;min-width:20px;padding:1px 7px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:11.5px;font-weight:700;text-align:center}
+  .nav-count:empty{display:none}
   .mono-sm{font-family:Consolas,"Courier New",monospace;font-size:12px;white-space:nowrap}
   #h-tbody .btn-mini{white-space:nowrap}
   .nc-qty{width:74px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;text-align:right;font:inherit}
@@ -456,6 +471,7 @@
         <button data-panel="v-clientes" onclick="setPanel('vendedor',this)"><span class="ic">👤</span> Clientes</button>
         <button data-panel="v-historial" onclick="setPanel('vendedor',this)"><span class="ic">🕘</span> Transacciones</button>
         <button data-panel="v-borradores" onclick="setPanel('vendedor',this)"><span class="ic">📄</span> Borradores</button>
+        <button class="solo-admin" onclick="enter('admin');irAContingencia()"><span class="ic">📡</span> Contingencia <span class="nav-count" id="sb-ct-badge"></span></button>
         <button class="solo-admin" onclick="enter('gerente')"><span class="ic">📊</span> Panel gerencial</button>
         <button class="solo-admin" onclick="enter('admin')"><span class="ic">🛡️</span> Administración</button>
       </nav>
@@ -518,7 +534,7 @@
               <div class="sim-mh solo-admin">
                 <label for="v-simular">Simular MH</label>
                 <select id="v-simular" class="pill">
-                  <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option>
+                  <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
                 </select>
               </div>
               <button class="btn btn-primary btn-block" id="v-confirmar" style="margin-top:16px" onclick="confirmSale()">✓ Confirmar venta</button>
@@ -553,7 +569,7 @@
             <div class="sim-mh solo-admin" style="margin:0 0 14px">
               <label for="h-simular">Simular MH (nota de crédito, anular, reintentar)</label>
               <select id="h-simular" class="pill">
-                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option>
+                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
               </select>
             </div>
             <div style="overflow-x:auto">
@@ -761,7 +777,7 @@
       <div class="side-brand"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span> Sistema de Ventas</div>
       <nav class="side-nav">
         <button class="active" data-panel="a-usuarios" onclick="setPanel('admin',this)"><span class="ic">👥</span> Usuarios</button>
-        <button data-panel="a-contingencia" onclick="setPanel('admin',this)"><span class="ic">📡</span> Contingencia</button>
+        <button data-panel="a-contingencia" onclick="setPanel('admin',this)"><span class="ic">📡</span> Contingencia <span class="nav-count" id="sb-ct-badge-admin"></span></button>
         <button data-panel="a-bitacora" onclick="setPanel('admin',this)"><span class="ic">📋</span> Bitácora</button>
         <button data-panel="a-config" onclick="setPanel('admin',this)"><span class="ic">⚙️</span> Configuración</button>
         <button onclick="enter('vendedor')"><span class="ic">🧾</span> Punto de venta</button>
@@ -830,15 +846,50 @@
 
         <!-- Contingencia (evento de contingencia, contingencia-schema-v4) -->
         <div class="panel" id="a-contingencia" style="display:none">
+          <!-- C2: lote automático del cierre del día -->
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px;margin-bottom:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Lote automático (cierre del día)</h3><span id="lp-estado"></span></div>
+              <div class="filters"><button class="btn-mini" onclick="cargarContingencia()">↻ Actualizar</button></div>
+            </div>
+            <p class="cont-note">Todos los días, a la hora indicada, el sistema arma un <b>lote</b> con todos los DTE que sigan en contingencia: envía el <b>evento de contingencia</b> a MH y, si lo acepta, transmite los documentos en una <b>recepción por lote</b>. Los que no se puedan enviar quedan para el siguiente lote.</p>
+            <div class="lp-grid">
+              <label class="lp-switch"><input type="checkbox" id="lp-activo" onchange="this.dataset.dirty=1"> Envío automático activo</label>
+              <div class="field" style="margin:0"><label for="lp-hora">Hora del cierre</label><input type="time" id="lp-hora" step="60" oninput="this.dataset.dirty=1"></div>
+              <button class="btn btn-ghost solo-admin" id="lp-guardar" onclick="guardarProgramacion()">Guardar</button>
+            </div>
+            <div class="lp-info">
+              <div><span class="muted small">Próximo lote</span><b id="lp-proximo">—</b></div>
+              <div><span class="muted small">Último lote automático</span><b id="lp-ultimo">—</b></div>
+            </div>
+          </div>
+
+          <!-- C3: cola de consultas a MH -->
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="page-head" style="flex-wrap:wrap;gap:10px;margin-bottom:10px">
+              <div><h3 style="display:inline-block;margin-right:8px">Cola de consultas a MH</h3><span id="cm-estado"></span></div>
+            </div>
+            <p class="cont-note">Durante el día se pregunta a Hacienda, <b>un documento por turno</b> (para no saturar el servicio), si recibió cada DTE que quedó en contingencia. Si MH ya lo tenía (su respuesta se perdió), el DTE queda <b>Aceptado</b> con su sello original y sale de la cola; si no lo tiene, es una contingencia real y la reporta el lote.</p>
+            <div class="lp-grid">
+              <label class="lp-switch"><input type="checkbox" id="cm-activo" onchange="this.dataset.dirty=1"> Consultas automáticas activas</label>
+              <div class="field" style="margin:0"><label for="cm-intervalo">Un documento cada (segundos)</label><input type="number" id="cm-intervalo" min="10" max="3600" step="1" oninput="this.dataset.dirty=1"></div>
+              <button class="btn btn-ghost solo-admin" id="cm-guardar" onclick="guardarConsultas()">Guardar</button>
+            </div>
+            <div class="lp-info">
+              <div><span class="muted small">Próxima consulta</span><b id="cm-proxima">—</b></div>
+              <div><span class="muted small">Última consulta automática</span><b id="cm-ultima">—</b></div>
+            </div>
+          </div>
+
+          <!-- Cola de contingencia + lote manual -->
           <div class="card card-pad" style="margin-bottom:16px">
             <div class="page-head" style="flex-wrap:wrap;gap:10px">
               <div><h3 style="display:inline-block;margin-right:8px">DTE en contingencia</h3><span class="muted small" id="ct-count"></span></div>
-              <div class="filters"><button class="btn-mini" onclick="cargarContingencia()">↻ Actualizar</button></div>
             </div>
-            <p class="cont-note">Documentos que MH no recibió (modelo diferido, tipo de contingencia 1: MH no disponible). Al restablecerse el servicio se envía el <b>evento de contingencia</b> con los seleccionados; si MH lo acepta, se transmiten y quedan PROCESADOS con sello.</p>
+            <p class="cont-note">Documentos que MH no recibió (modelo diferido, tipo de contingencia 1: MH no disponible). La cola de consultas los revisa uno a uno en MH; también puedes <b>consultar</b> o <b>reintentar</b> uno por uno, esperar el lote del cierre o <b>enviar un lote ahora</b> con todos los pendientes. MH pide reportarlos dentro de las 24 horas: los que llevan más tiempo se marcan en rojo.</p>
             <div style="overflow-x:auto">
             <table>
-              <thead><tr><th style="width:34px"><input type="checkbox" id="ct-todos" onchange="marcarTodosContingencia(this.checked)" title="Seleccionar todos"></th><th>Fecha</th><th>Número de control</th><th>Tipo</th><th>Receptor</th><th class="num">Total</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Número de control</th><th>Tipo</th><th>Receptor</th><th>En contingencia</th><th>Consulta MH</th><th class="num">Total</th><th class="num">Acciones</th></tr></thead>
               <tbody id="ct-tbody"></tbody>
             </table>
             </div>
@@ -847,20 +898,22 @@
               <textarea id="ct-motivo" rows="2" maxlength="500" placeholder="Ej.: El servicio de recepción de MH no respondió"></textarea>
             </div>
             <div class="sim-mh" style="margin:0 0 14px">
-              <label for="ct-simular">Simular MH (evento de contingencia)</label>
+              <label for="ct-simular">Simular MH (lote, consultas y reintentos)</label>
               <select id="ct-simular" class="pill">
-                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option>
+                <option value="ok">OK</option><option value="rechazo">Rechazo</option><option value="contingencia">Contingencia</option><option value="timeout">Timeout (MH lo recibió)</option>
               </select>
             </div>
             <div class="form-actions" style="justify-content:flex-end">
-              <button class="btn btn-primary" id="ct-enviar" onclick="enviarEventoContingencia()">📡 Enviar evento y transmitir</button>
+              <button class="btn btn-primary" id="ct-enviar" onclick="enviarLoteContingencia()">📦 Enviar lote ahora</button>
             </div>
           </div>
+
+          <!-- Lotes enviados -->
           <div class="card card-pad">
-            <div class="page-head"><div><h3 style="display:inline-block;margin-right:8px">Eventos de contingencia</h3><span class="muted small" id="ce-count"></span></div></div>
+            <div class="page-head"><div><h3 style="display:inline-block;margin-right:8px">Lotes enviados</h3><span class="muted small" id="ce-count"></span></div></div>
             <div style="overflow-x:auto">
             <table>
-              <thead><tr><th>Fecha</th><th>Código de generación</th><th class="num">DTE</th><th>Período</th><th>Usuario</th><th>Estado MH</th><th class="num">Acciones</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Origen</th><th>Código de lote</th><th class="num">DTE</th><th>Período</th><th>Usuario</th><th>Evento MH</th><th class="num">Acciones</th></tr></thead>
               <tbody id="ce-tbody"></tbody>
             </table>
             </div>

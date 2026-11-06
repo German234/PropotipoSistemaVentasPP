@@ -3,7 +3,8 @@
  *
  * enviar (una transacción): DTE en CONTINGENCIA (los indicados o todos, máx. 1000, bloqueados con UPDLOCK)
  *   → JSON del evento → firmador → MH simulado (X-Simular):
- *   PROCESADO     → se guarda el evento y se transmiten sus DTE (MH ok) → PROCESADO con sello.
+ *   PROCESADO     → se guarda el evento y sus DTE se transmiten en un lote (recepción por lote simulada,
+ *                   codigoLote) → cada DTE queda PROCESADO con sello.
  *   RECHAZADO     → se guarda el evento; los DTE siguen en CONTINGENCIA.
  *   sin respuesta → 503 MH_NO_DISPONIBLE; no se guarda (solo bitácora SIN_RESPUESTA).
  */
@@ -20,7 +21,8 @@ const mhContingencia = require('../dte/simuladores/mhContingencia');
 
 const MAX_DTE = 1000; // maxItems de detalleDTE
 const COLS_DTE = `d.id, d.tipo_dte AS tipoDte, d.codigo_generacion AS codigoGeneracion, d.numero_control AS numeroControl,
-                  d.estado, d.sello_recibido AS selloRecibido, d.fecha_emision AS fechaEmision, d.total`;
+                  d.estado, d.sello_recibido AS selloRecibido, d.fecha_emision AS fechaEmision, d.total, d.firma`;
+const ORIGENES = ['MANUAL', 'AUTOMATICO'];
 
 /** { dteIds?: int[], motivo?: string ≤ 500 } */
 function validarBody(body) {
@@ -72,8 +74,10 @@ const dteOut = (d) => ({
  * @param {object} body   { dteIds?, motivo? }
  * @param {object} usuario req.usuario
  * @param {'ok'|'rechazo'|'contingencia'} modo  X-Simular (aplica al evento; los DTE se transmiten con ok)
+ * @param {'MANUAL'|'AUTOMATICO'} origen  MANUAL = botón "Enviar lote ahora"; AUTOMATICO = cierre del día (loteAutomatico)
  */
-async function enviar(body, usuario, modo = 'ok') {
+async function enviar(body, usuario, modo = 'ok', origen = 'MANUAL') {
+  if (!ORIGENES.includes(origen)) throw new Error(`origen inválido: ${origen}`);
   const datos = validarBody(body);
   const emisor = await emisorService.obtener();
 
@@ -93,7 +97,7 @@ async function enviar(body, usuario, modo = 'ok') {
     });
     const firma = firmador.firmar(jsonEvento, modo);
     const respuestaMh = mhContingencia.recibirEvento({ codigoGeneracion }, modo);
-    const resumen = { codigoGeneracionEvento: codigoGeneracion, cantidad: dtes.length, dteIds: dtes.map((d) => d.id) };
+    const resumen = { codigoGeneracionEvento: codigoGeneracion, origen, cantidad: dtes.length, dteIds: dtes.map((d) => d.id) };
 
     if (!respuestaMh) {
       // Fuera de la transacción (que se revierte): el intento fallido queda en bitácora.
@@ -105,11 +109,11 @@ async function enviar(body, usuario, modo = 'ok') {
 
     const ins = await q(
       `INSERT INTO dbo.evento_contingencia (usuario_id, codigo_generacion, tipo_contingencia, motivo, f_inicio, f_fin, fecha,
-                                            estado, json_evento, firma, respuesta_mh, sello_recibido)
+                                            estado, json_evento, firma, respuesta_mh, sello_recibido, origen)
        OUTPUT inserted.id
-       VALUES (@usuarioId, @codigo, @tipo, @motivo, @fInicio, @fFin, @fecha, @estado, @jsonEvento, @firma, @respuestaMh, @sello)`,
+       VALUES (@usuarioId, @codigo, @tipo, @motivo, @fInicio, @fFin, @fecha, @estado, @jsonEvento, @firma, @respuestaMh, @sello, @origen)`,
       {
-        usuarioId: usuario.id, codigo: codigoGeneracion, tipo: TIPO_CONTINGENCIA_MH, motivo: datos.motivo,
+        origen, usuarioId: usuario.id, codigo: codigoGeneracion, tipo: TIPO_CONTINGENCIA_MH, motivo: datos.motivo,
         fInicio: inicio, fFin: fechaEmision, fecha: fechaEmision, estado: respuestaMh.estado,
         jsonEvento: JSON.stringify(jsonEvento), firma: JSON.stringify(firma),
         respuestaMh: JSON.stringify(respuestaMh), sello: respuestaMh.selloRecibido,
@@ -122,16 +126,34 @@ async function enviar(body, usuario, modo = 'ok') {
 
     await registrar(usuario.id, 'CONTINGENCIA', 'evento_contingencia', eventoId, {
       ...resumen, resultado: respuestaMh.estado,
-      mensaje: `Evento de contingencia con ${dtes.length} DTE (simulado): ${respuestaMh.descripcionMsg}`,
+      mensaje: `${origen === 'AUTOMATICO' ? 'Lote automático (cierre del día)' : 'Lote manual'}: evento de contingencia con ${dtes.length} DTE (simulado): ${respuestaMh.descripcionMsg}`,
     }, q);
 
-    // Evento aceptado → transmisión de los DTE (MH ya disponible: modo ok).
+    // Evento aceptado → recepción por lote de los DTE firmados (MH ya disponible: modo ok).
+    let lote = null;
     if (respuestaMh.estado === 'PROCESADO') {
+      const jsonLote = {
+        ambiente: '00', idEnvio: nuevoCodigo(), version: 2, nitEmisor: emisor.nit,
+        documentos: dtes.map((d) => (parse(d.firma) || {}).body || null),
+      };
+      const respuestaLote = mhContingencia.recibirLote(jsonLote);
       for (const d of dtes) {
         const t = await transmitir(q, d, usuario, 'ok', codigoGeneracion);
         d.estado = t.estado;
         d.selloRecibido = t.selloRecibido;
       }
+      lote = {
+        codigoLote: respuestaLote.codigoLote,
+        idEnvio: jsonLote.idEnvio,
+        procesados: dtes.filter((d) => d.estado === 'PROCESADO').length,
+        rechazados: dtes.filter((d) => d.estado === 'RECHAZADO').length,
+        jsonLote,
+        respuestaMh: respuestaLote,
+      };
+      await q(
+        `UPDATE dbo.evento_contingencia SET codigo_lote = @codigoLote, respuesta_lote = @lote WHERE id = @id`,
+        { id: eventoId, codigoLote: lote.codigoLote, lote: JSON.stringify(lote) }
+      );
     }
 
     return {
@@ -145,11 +167,14 @@ async function enviar(body, usuario, modo = 'ok') {
       tipoContingencia: TIPO_CONTINGENCIA_MH,
       motivo: datos.motivo,
       usuario: usuario.usuario,
+      origen,
+      codigoLote: lote ? lote.codigoLote : null,
       cantidad: dtes.length,
       dtes: dtes.map(dteOut),
       jsonEvento,
       firmador: firma,
       respuestaMh,
+      lote,
     };
   });
 }
@@ -157,12 +182,14 @@ async function enviar(body, usuario, modo = 'ok') {
 const SELECT_EVENTO = `
   SELECT e.id, e.codigo_generacion AS codigoGeneracion, e.estado, e.sello_recibido AS selloRecibido, e.fecha,
          e.f_inicio AS fInicio, e.f_fin AS fFin, e.tipo_contingencia AS tipoContingencia, e.motivo, u.usuario,
+         e.origen, e.codigo_lote AS codigoLote,
          (SELECT COUNT(*) FROM dbo.evento_contingencia_dte x WHERE x.evento_id = e.id) AS cantidad`;
 
 const eventoOut = (e) => ({
   id: e.id, codigoGeneracion: e.codigoGeneracion, estado: e.estado, selloRecibido: e.selloRecibido,
   fecha: fechaIso(e.fecha), fInicio: fechaIso(e.fInicio), fFin: fechaIso(e.fFin),
-  tipoContingencia: e.tipoContingencia, motivo: e.motivo, usuario: e.usuario, cantidad: e.cantidad,
+  tipoContingencia: e.tipoContingencia, motivo: e.motivo, usuario: e.usuario, origen: e.origen,
+  codigoLote: e.codigoLote || null, cantidad: e.cantidad,
 });
 
 /** GET /api/contingencia — eventos, más reciente primero. */
@@ -174,7 +201,7 @@ async function listar() {
 /** GET /api/contingencia/:id — evento con sus DTE (estado actual), JSON, firma y respuesta MH. */
 async function obtener(id) {
   const r = await query(
-    `${SELECT_EVENTO}, e.json_evento AS jsonEvento, e.firma, e.respuesta_mh AS respuestaMh
+    `${SELECT_EVENTO}, e.json_evento AS jsonEvento, e.firma, e.respuesta_mh AS respuestaMh, e.respuesta_lote AS lote
      FROM dbo.evento_contingencia e JOIN dbo.usuarios u ON u.id = e.usuario_id WHERE e.id = @id`,
     { id }
   );
@@ -191,7 +218,14 @@ async function obtener(id) {
     jsonEvento: parse(e.jsonEvento),
     firmador: parse(e.firma),
     respuestaMh: parse(e.respuestaMh),
+    lote: parse(e.lote),
   };
+}
+
+/** Cantidad de DTE en CONTINGENCIA (cola pendiente del próximo lote). */
+async function contarPendientes() {
+  const r = await query(`SELECT COUNT(*) AS n FROM dbo.dte WHERE estado = 'CONTINGENCIA'`);
+  return r.recordset[0].n;
 }
 
 /** Último evento de contingencia que incluyó al DTE (resumen) o null. Lo usa GET /api/dte/:id. */
@@ -206,4 +240,4 @@ async function ultimoDeDte(dteId) {
   return e ? { ...e, fecha: fechaIso(e.fecha) } : null;
 }
 
-module.exports = { enviar, listar, obtener, ultimoDeDte };
+module.exports = { enviar, listar, obtener, ultimoDeDte, contarPendientes };

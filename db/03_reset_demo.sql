@@ -13,6 +13,7 @@ SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
 DELETE FROM dbo.evento_invalidacion;
+DELETE FROM dbo.mh_simulado_dte;
 DELETE FROM dbo.evento_contingencia_dte;
 DELETE FROM dbo.evento_contingencia;
 DELETE FROM dbo.dte_detalle;

@@ -17,6 +17,9 @@
 - **F4 Transacciones + NC + ciclo de vida + bitácora — HECHO (2026-11-04).** `GET /api/dte` con filtros y badges, detalle en el modal de F3, Nota de crédito 05, Anular, Reintentar envío y bitácora con export CSV. **Frontend completo (F1–F4).** Sin cambios de contrato.
 - **I1 Integración — HECHO (2026-11-04).** `USE_MOCK = false`; las pantallas se recorrieron contra la API real (sin diferencias de contrato en la API; se corrigió `mocks.js`). `README.md`, `docs/DEMO.md` y `db/03_reset_demo.sql`.
 - **C1 Evento de contingencia — HECHO (2026-11-05).** DTE emitidos en contingencia con `tipoModelo/tipoOperacion 2`; `POST/GET /api/contingencia` (esquema v4) y panel *Administración → Contingencia*. Cambio de contrato (ver abajo).
+- **Q1 Pruebas automatizadas — HECHO (2026-11-06).** Jest + Supertest + Ajv: 256 pruebas al cerrar Q1, 281 tras C2, 309 tras C3 (7 suites unitarias, 11 de integración contra la BD aislada `BatallonAtlacatl_Test`), cobertura ≈ 99 % de líneas. Flujos 01/03/05, rechazo, contingencia y reintento, evento de contingencia (C1), invalidación. Encontró y se corrigió un bug de `redondear2` (NC → 500). Sin cambios de contrato.
+- **C2 Lotes de contingencia — HECHO (2026-11-06).** Lote manual ("Enviar lote ahora" con todos los pendientes) y lote automático del cierre del día (hora configurable); recepción por lote simulada con `codigoLote`; panel *Contingencia* rehecho y accesible desde el menú del POS. 281 pruebas en verde. Cambio de contrato (ver abajo).
+- **C3 Cola de consultas a MH — HECHO (2026-11-06).** `X-Simular: timeout` (MH recibió pero la respuesta se perdió); durante el día se consulta en MH un DTE en contingencia por turno (round-robin, intervalo configurable) y los que MH sí tenía quedan PROCESADO con su sello original; consulta puntual `POST /api/dte/:id/consultar`. 309 pruebas en verde. Cambio de contrato (ver abajo).
 - ✅ **MVP COMPLETO (2026-11-04).** Backend B1–B4 + frontend F1–F4 integrados: login con roles, catálogos, emisión 01/03/05, invalidación, contingencia y reintento, transacciones y bitácora, todo contra SQL Server. Guion de demo verificado de punta a punta.
 
 ## Mapa de archivos
@@ -26,13 +29,13 @@
 | `CLAUDE.md` | Reglas del proyecto, convenciones y reglas DTE |
 | `PROGRESO.md` | Este índice de avance |
 | `docs/API.md` | Contrato de la API (fuente de verdad) |
-| `db/01_schema.sql` | Esquema idempotente (11 tablas): usuarios, emisor, clientes, productos, correlativos, dte, dte_detalle, evento_invalidacion, evento_contingencia, evento_contingencia_dte, bitacora |
+| `db/01_schema.sql` | Esquema idempotente (11 tablas): usuarios, emisor, clientes, productos, correlativos, dte, dte_detalle, evento_invalidacion, evento_contingencia (+ `origen`, `codigo_lote`, `respuesta_lote` con ALTER idempotente, C2), evento_contingencia_dte, bitacora; C3: `dte` + `consultas_mh`/`ultima_consulta_mh` (ms)/`resultado_consulta_mh` y tabla `mh_simulado_dte` (lado de Hacienda del simulador) |
 | `db/02_seed.sql` | Seed idempotente: admin/admin123, vendedor/vendedor123, emisor M001/P001, 10 productos, 2 consumidores, 2 contribuyentes, correlativos 01/03/05 = 0 |
 | `db/03_reset_demo.sql` | Reinicia los datos de demo: borra DTE, eventos (invalidación y contingencia) y bitácora; correlativos en 0; productos/clientes como el seed (borra los creados después); reinicia ids de DTE. No toca usuarios ni emisor |
 | `db/genHash.js` | `node db/genHash.js <clave>...` imprime hashes bcrypt (usa bcryptjs de backend/) |
-| `backend/package.json` | Dependencias; scripts `start` y `dev` (node --watch) |
-| `backend/.env.example` | DB_SERVER (o DB_HOST), DB_PORT (opcional), DB_ENCRYPT/DB_TRUST_CERT (opcionales), DB_NAME, DB_USER, DB_PASSWORD, JWT_SECRET, PORT. Copiar a `.env` |
-| `backend/src/server.js` | Carga `.env` y levanta el servidor |
+| `backend/package.json` | Dependencias; scripts `start`, `dev` (node --watch), `test`, `test:unit`, `test:integration`, `test:coverage` (devDeps: jest, supertest, ajv, ajv-formats) |
+| `backend/.env.example` | DB_SERVER (o DB_HOST), DB_PORT (opcional), DB_ENCRYPT/DB_TRUST_CERT (opcionales), DB_NAME, DB_USER, DB_PASSWORD, JWT_SECRET, PORT, CONTINGENCIA_LOTE_HORA/ACTIVO (C2), CONSULTA_MH_ACTIVO/INTERVALO_SEG (C3). Copiar a `.env` |
+| `backend/src/server.js` | Carga `.env`, levanta el servidor y arranca los temporizadores del lote automático y de la cola de consultas a MH |
 | `backend/src/app.js` | Express: cors, json, rutas `/api/*`, 404 API, estáticos de `frontend/`, manejador de errores. **Registrar aquí las rutas nuevas** |
 | `backend/src/config/db.js` | Pool mssql lazy; `query(sql, params)`; `withTransaction(async ({tx, query}) => ...)` |
 | `backend/src/utils/respuesta.js` | `AppError(codigo, mensaje, status)`, `ok(res, data, status)`, `asyncHandler(fn)` |
@@ -55,18 +58,22 @@
 | `backend/src/dte/builders/factura01.js`, `ccf03.js` | `construir({...})` → JSON completo 01 v2 / 03 v4 |
 | `backend/src/dte/builders/notaCredito05.js` | `construir({..., ccf:{codigoGeneracion, fecEmi, receptor}})` → JSON 05 v4 (receptor copiado del CCF) |
 | `backend/src/dte/builders/contingencia.js` | `construir({codigoGeneracion, fTransmision, hTransmision, emisor, responsable, dtes, motivo})` → evento de contingencia v4 |
-| `backend/src/dte/simuladores/mhContingencia.js` | `recibirEvento({codigoGeneracion}, modo)` → respuesta MH del evento de contingencia o `null` (sin respuesta) |
+| `backend/src/dte/simuladores/mhContingencia.js` | `recibirEvento({codigoGeneracion}, modo)` → respuesta MH del evento de contingencia o `null` (sin respuesta); `recibirLote({idEnvio})` → `RECIBIDO` + `codigoLote` (C2) |
 | `backend/src/dte/builders/invalidacion.js` | `construir({codigoGeneracion, fecEmi, horEmi, emisor, dte, motivo})` → evento de invalidación v3 |
 | `backend/src/dte/simuladores/mhAnulacion.js` | `anular({codigoGeneracion}, modo)` → respuesta MH del evento o `null` (sin respuesta) |
 | `backend/src/dte/simuladores/firmador.js` | `firmar(json, modo)` → `{status:"OK", body: JWS falso}` |
-| `backend/src/dte/simuladores/mhRecepcion.js` | `leerModo(req)` (X-Simular), `recibir({codigoGeneracion}, modo)` → respuesta MH o `null` (contingencia), `generarSello()`, `fhProcesamiento()` |
-| `backend/src/services/dteService.js` | Escrituras, cada una en una transacción: `emitir` (01/03), `emitirNotaCredito` (05), `reintentar`, `invalidar`. Comparten `enviarYGuardar`, `ajustarStock`, `pendientesAcreditar`; `transmitir(q, d, usuario, modo, codigoEvento?)` (reintento y evento de contingencia) |
-| `backend/src/services/contingenciaService.js` | `enviar(body, usuario, modo)` (evento + transmisión, una transacción), `listar()`, `obtener(id)`, `ultimoDeDte(dteId)` |
-| `backend/src/controllers/contingenciaController.js`, `routes/contingencia.js` | `POST /api/contingencia` (ADMIN, 201), `GET /`, `GET /:id` (cualquier rol) |
+| `backend/src/dte/simuladores/mhConsulta.js` | C3: `consultar(registro, codigoGeneracion, modo)` → respuesta PROCESADO original, NO ENCONTRADO (004) o `null` |
+| `backend/src/dte/simuladores/mhRegistro.js` | C3: "BD de Hacienda" (`mh_simulado_dte`): `guardarSinRespuesta(q, …)` (timeout) y `buscar(q, codigo)` |
+| `backend/src/dte/simuladores/mhRecepcion.js` | `leerModo(req)` (X-Simular, incl. `timeout`), `sinRespuesta(modo)`, `recibir({codigoGeneracion}, modo)` → respuesta MH o `null` (contingencia), `generarSello()`, `fhProcesamiento()` |
+| `backend/src/services/dteService.js` | (C3: timeout guarda el original en `mh_simulado_dte`; `transmitir` devuelve el sello original si MH ya lo tenía; `aplicarRegistroMh`, `cargarDteBloqueado` exportados) Escrituras, cada una en una transacción: `emitir` (01/03), `emitirNotaCredito` (05), `reintentar`, `invalidar`. Comparten `enviarYGuardar`, `ajustarStock`, `pendientesAcreditar`; `transmitir(q, d, usuario, modo, codigoEvento?)` (reintento y evento de contingencia) |
+| `backend/src/services/contingenciaService.js` | `enviar(body, usuario, modo, origen)` (evento + recepción por lote + transmisión, una transacción), `listar()`, `obtener(id)`, `ultimoDeDte(dteId)`, `contarPendientes()` |
+| `backend/src/services/consultaMhService.js` | C3: cola de consultas. `consultar(id, usuario, modo)` (puntual), `consultarSiguiente(modo)` (un turno, READPAST), `iniciar`/`detener`, `obtener`/`actualizar` (GET/PUT consultas). Config en memoria |
+| `backend/src/services/loteAutomaticoService.js` | C2: lote del cierre del día. Config en memoria (`activo`, `hora`; inicial desde `.env`), `proximaEjecucion(hora)`, `ejecutar(modo)` (no lanza; `ultimaEjecucion`), `iniciar`/`detener` (setTimeout), `obtener`/`actualizar` (GET/PUT programacion) |
+| `backend/src/controllers/contingenciaController.js`, `routes/contingencia.js` | `POST /api/contingencia` (ADMIN, 201), `GET /`, `GET /:id` (cualquier rol); `GET /programacion` (cualquier rol), `PUT /programacion` (ADMIN); `GET/PUT /consultas` (C3) |
 | `backend/src/services/dteConsultasService.js` | `listar(filtros)`, `obtener(id)` (JSON parseado, items con pendientes, NC, evento de invalidación, `eventoContingencia`) |
 | `backend/src/services/bitacoraService.js` | `listar(filtros)` para `GET /api/bitacora` |
 | `backend/src/controllers/bitacoraController.js`, `routes/bitacora.js` | `GET /api/bitacora` (cualquier rol) |
-| `backend/src/controllers/dteController.js`, `routes/dte.js` | `POST /api/dte/01|03|05` (201), `POST /:id/invalidar|reintentar` (200), `GET /`, `GET /:id` (cualquier rol) |
+| `backend/src/controllers/dteController.js`, `routes/dte.js` | `POST /api/dte/01|03|05` (201), `POST /:id/invalidar|reintentar|consultar` (200), `GET /`, `GET /:id` (cualquier rol) |
 | `backend/requests.http` | Ejemplos de todos los endpoints (REST Client de VS Code) |
 | `frontend/index.html` | Solo HTML + CSS del prototipo (≈67 KB, 1019 líneas). Carga `js/mocks.js`, `api.js`, `pdf-data.js`, `app.js` en ese orden. Servido por Express en `/`. Mapa de vistas en *Frontend → Mapa del prototipo* |
 | `frontend/js/app.js` | Lógica de UI (globales para los `onclick` inline). F2: sesión, inventario y clientes; F3: venta y emisión 01/03; F4: transacciones, NC 05, anular, reintentar y bitácora contra `api.*`; C1: panel Contingencia. Panel gerencial (salvo el KPI de contingencia), usuarios y config del admin siguen fijos |
@@ -77,6 +84,15 @@
 | `.gitignore` | Ignora node_modules y .env |
 | `README.md` | Instalación (scripts de `db/`, `.env`, `npm start`), usuarios de prueba, reinicio de demo, modo mocks, problemas frecuentes |
 | `docs/DEMO.md` | Guion de demo de 5 minutos con los valores esperados (BD reiniciada) y plan B |
+| `docs/PRUEBAS.md` | Cómo correr las pruebas y matriz requisito (CLAUDE.md / API.md) → prueba para QA |
+| `backend/jest.config.js` | Proyectos Jest `unit` (sin BD) e `integration` (globalSetup crea la BD de pruebas); cobertura de `src/` |
+| `backend/tests/setupEnv.js`, `globalSetup.js` | Carga `.env` y fuerza `DB_NAME=BatallonAtlacatl_Test` (o `DB_TEST_NAME`; prohíbe la BD de la demo); crea y siembra esa BD |
+| `backend/tests/helpers/testDb.js` | `crearBd()` / `reiniciarBd()` con los scripts reales de `db/` (sin USE/PRINT/DBCC) |
+| `backend/tests/helpers/api.js` | `prepararApi()` → reinicia BD, tokens admin/vendedor, `prod`/`cli` del seed, `emitir`, `reintentar`, `invalidar`, `detalle`, `stock`, `bitacora`; regex de UUID/sello/numeroControl |
+| `backend/tests/helpers/schemas.js` | Ajv con `schemas-mh/` + matcher `toCumplirEsquemaMh('01'|'03'|'05'|'invalidacion')` |
+| `backend/tests/fixtures/datos.js` | Emisor, productos y clientes fijos para las unitarias |
+| `backend/tests/unit/*.test.js` | utilidades, numeroALetras, calculos, simuladores, builders (+ esquemas MH), contingencia (enContingencia + evento v4 + lote + próxima ejecución/temporizador + timeout/consulta MH + temporizador de la cola), middleware |
+| `backend/tests/integration/*.test.js` | auth, catalogos, dte01.factura, dte03.ccf, dte05.notaCredito, contingencia, eventoContingencia, loteContingencia (C2), consultaMh (C3), invalidacion, consultas |
 
 ## Backend (B1–B4)
 
@@ -103,6 +119,13 @@
   - Esquemas: 05 según `fe-nc-v4.json` (sin `otrosDocumentos`; receptor con tipoDocumento/numDocumento; ítems con `numeroDocumento`, `totalIva`; resumen con `totalIva`, `codigoRetencionMH`). Evento según `invalidacion-schema-v3.json` (`fecEmi/horEmi`, `fusion`, emisor con `codEstableMH`, documento con datos del receptor y **sin `montoIva`**; se corrigió la regla en CLAUDE.md).
   - Refactor: 01/03/05 comparten `enviarYGuardar` en `dteService`; movimientos de stock con `ajustarStock` (`UPDATE ... WHERE stock + delta >= 0`).
   - Verificado contra la BD real: todo el flujo y sus errores (exceso de NC, otro receptor, producto fuera del CCF, NC sobre 01, invalidar CCF con NC, doble invalidación, reintento fuera de contingencia, contingencia → rechazo devuelve stock); stock final cuadrado. Los 12 JSON (01, 03, 05, eventos) validan con ajv contra `schemas-mh/` (con `multipleOfPrecision`: el `multipleOf` estricto de ajv falla con decimales en coma flotante; ningún monto tiene más de 2 decimales). Datos de prueba limpiados.
+
+- [x] **Q1 — Pruebas automatizadas del backend (2026-11-06).**
+  - `npm test` (desde `backend/`) corre 256 pruebas en ~13 s; `test:unit` no necesita BD; `test:coverage` → `backend/coverage/` (en `.gitignore`). Cobertura: 97 % sentencias, 85 % ramas, 99 % líneas.
+  - Integración con Supertest sobre `app` (sin abrir puerto) contra `BatallonAtlacatl_Test`: se crea sola con `db/01` + `db/02` y cada archivo la reinicia con `db/03` en `beforeAll`. `--runInBand` obligatorio (comparten BD).
+  - Todo JSON DTE y evento generado se valida con ajv contra `schemas-mh/` (`multipleOfPrecision`).
+  - Bug corregido: `utils/dinero.js` `redondear2` devolvía `NaN` con residuos en notación exponencial (`4.4e-16`) → NC de 3 de 10 × $1.10 respondía 500. Ahora < 0.005 → 0. Con pruebas de regresión.
+  - Matriz requisito → prueba en `docs/PRUEBAS.md`. Pendiente (fuera de alcance): pruebas automatizadas del frontend.
 
 ## Frontend (F1–F4)
 
@@ -221,7 +244,28 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
   - Verificado: 44 comprobaciones de API contra la BD real (JSON 01/03/05 en contingencia y eventos validados con ajv contra `schemas-mh/`, permisos, 400/404/409/503, rechazo, subconjunto, todos, stock, reintento individual, bitácora); el mismo guion contra `mocks.js`: 44/44. Recorrido en Edge headless contra la API real: 25/28 (las 3 diferencias eran del guion: contaba los eventos de la prueba anterior) + capturas, sin errores JS.
   - Pendiente: la BD local quedó con datos de estas pruebas (DTE 3–10, 6 eventos de contingencia; antes había solo 2 DTE); correr `db/03_reset_demo.sql` antes de la demo. Tipos de contingencia 2–5 y el envío automático periódico no están (fuera de alcance).
 
+- [x] **C2 — Lotes de contingencia (2026-11-06).** Backend + frontend + mocks + pruebas.
+  - Archivos nuevos: `services/loteAutomaticoService.js`, `tests/integration/loteContingencia.test.js`. Modificados: `db/01_schema.sql` (3 columnas en `evento_contingencia`, ALTER idempotente; **aplicado a la BD local**), `mhContingencia.js` (`recibirLote`), `contingenciaService.js` (origen, lote, `contarPendientes`), controller/rutas (`/programacion`), `server.js` (temporizador), `.env.example`, `frontend/index.html`, `js/app.js`, `js/api.js` (`contingencia.programacion/programar`), `js/mocks.js`, `tests/unit/contingencia.test.js`, `docs/API.md`, `docs/PRUEBAS.md`, `docs/DEMO.md`, `README.md`.
+  - Lote = evento de contingencia v4 + (si MH lo acepta) recepción por lote: `jsonLote {ambiente, idEnvio, version 2, nitEmisor, documentos: JWS de cada DTE}` → MH `RECIBIDO` + `codigoLote` → cada DTE se transmite (`transmitir`) y queda PROCESADO con sello. Se guarda en `codigo_lote`/`respuesta_lote`.
+  - Manual: "📦 Enviar lote ahora (N DTE)" = `POST /api/contingencia` sin `dteIds` (todos los pendientes del momento). Se quitaron los checkboxes de selección de la UI (la API sigue aceptando `dteIds`). Reintento individual por fila.
+  - Automático: `setTimeout` a la próxima `HH:mm` (hora local), luego se reprograma; todos los pendientes, firmado por el primer ADMIN activo, motivo fijo de cierre, MH en `ok`. Sin pendientes → `SIN_PENDIENTES` en bitácora (sin evento); rechazo / sin respuesta → los DTE quedan para el siguiente lote. Solo corre con `server.js` (las pruebas llaman a `ejecutar()`).
+  - Decisiones: programación en memoria (inicial desde `.env`; un PUT se pierde al reiniciar) para no agregar otra tabla; un solo proceso de servidor (sin bloqueo distribuido; dos lotes simultáneos se serializan por UPDLOCK y el segundo encuentra la cola vacía); se marca en rojo un DTE con más de 24 h en contingencia (plazo para reportarlo).
+  - UI (`#a-contingencia`): tarjeta *Lote automático* (estado, activo, hora, Guardar, próximo y último lote con enlace), cola con antigüedad + Reintentar, motivo, Simular MH, "Enviar lote ahora", tabla *Lotes enviados* (origen ⏰/✋, código de lote). Modal "Lote de contingencia" con código y resultado del lote; pestaña MH incluye `lote`. Botón **Contingencia** con contador en el menú del POS (solo ADMIN) y contador en el menú de Administración. `contarContingencia()` al iniciar sesión y tras cada operación.
+  - Verificado: 281/281 pruebas; servidor real contra la BD de pruebas con la hora 2 min adelante → el temporizador disparó el lote (2 DTE PROCESADO, `codigoLote`) y se reprogramó para el día siguiente; recorrido en Edge headless (contador del menú, programación, guardar hora, lote manual, modal, cola vacía) sin errores JS + capturas.
+  - Pendiente: la programación no persiste entre reinicios; los mocks no tienen temporizador (solo GET/PUT de programación).
+- [x] **C3 — Cola de consultas a MH (2026-11-06).** Backend + frontend + mocks + pruebas.
+  - Problema: un DTE puede quedar en CONTINGENCIA porque la **respuesta** de MH se perdió aunque MH sí lo recibió. Simulación: `X-Simular: timeout` guarda en `mh_simulado_dte` el JSON/firma original y su respuesta PROCESADO (sello) y para el POS se comporta como `contingencia`.
+  - Archivos nuevos: `services/consultaMhService.js`, `dte/simuladores/mhConsulta.js`, `dte/simuladores/mhRegistro.js`, `tests/integration/consultaMh.test.js`. Modificados: `db/01_schema.sql` (3 columnas en `dte` + tabla `mh_simulado_dte`; **aplicado a la BD local**), `db/03_reset_demo.sql`, `mhRecepcion.js` (`timeout`, `sinRespuesta`), `mhAnulacion.js`, `mhContingencia.js`, `dteService.js`, `dteConsultasService.js` (`consultaMh`), controllers/rutas, `loteAutomaticoService.js` (exporta `usuarioSistema`), `server.js`, `.env.example`, `frontend/index.html`, `js/app.js`, `js/api.js`, `js/mocks.js`, `tests/unit/contingencia.test.js`, `docs/API.md`, `docs/PRUEBAS.md`, `docs/DEMO.md`, `README.md`, `CLAUDE.md` (X-Simular).
+  - Cola: `setTimeout` encadenado cada `intervaloSeg` (defecto 60 s); cada turno toma **un** DTE en CONTINGENCIA (`UPDLOCK, READPAST`), orden: nunca consultados → consulta más antigua → id (`ultima_consulta_mh` DATETIME2(3) para que no empaten dos turnos en el mismo segundo). ENCONTRADO → PROCESADO con el sello original, JSON/firma de MH (modelo previo), stock igual. NO_ENCONTRADO / SIN_RESPUESTA → sigue y pasa al final. Firmada por el primer ADMIN activo, MH en `ok`.
+  - Decisiones: bitácora `CONSULTA_MH` solo para consultas manuales y para ENCONTRADO (los turnos automáticos sin novedad solo actualizan columnas, para no inundar la bitácora); reintento y lote consultan `mh_simulado_dte` y no duplican el documento; config en memoria como C2.
+  - UI: tarjeta *Cola de consultas a MH* (estado, activo, intervalo, próxima consulta con el DTE que sigue y cuenta regresiva, última consulta automática); columna *Consulta MH* en la cola (Siguiente / Turno N, consultas y resultado) y botón **Consultar** por fila; "Consultar MH" en Transacciones para DTE en CONTINGENCIA; fila *Consultas a MH* en el detalle; opción *Timeout (MH lo recibió)* en los tres "Simular MH". El panel se refresca solo cada 10 s mientras está abierto (sin pisar inputs editados) y el contador del menú también; tras un error (p. ej. 409 porque la cola ya lo resolvió) recarga.
+  - Verificado: 309/309 pruebas; servidor real con la cola a 10 s y 3 DTE (contingencia, timeout, contingencia): un DTE por turno, el de timeout ENCONTRADO en su turno, los otros rotando; recorrido en Edge headless (consulta manual, auto-refresco, guardar intervalo) sin errores JS + capturas; mocks: emisión timeout, consulta, PUT, reintento.
+  - Pendiente: config no persiste entre reinicios; la cola no se pausa durante el lote (no hace falta: los bloqueos lo serializan).
+
 ## Cambios de contrato
+
+- C3: `X-Simular` admite `timeout` (para el POS = contingencia; MH sí guardó el DTE; en eventos = sin respuesta). Nuevos `POST /api/dte/:id/consultar` (cualquier rol), `GET /api/contingencia/consultas` (cualquier rol) y `PUT` (ADMIN, `{activo?, intervaloSeg?}`). `GET /api/dte/:id` agrega `consultaMh`. Reintento/lote de un DTE que MH ya tenía → sello original (con `observaciones`) y JSON de modelo previo. Bitácora: acción `CONSULTA_MH`; `ACTUALIZAR` con entidad `consultas_mh`.
+- C2: `POST/GET /api/contingencia` y `GET /:id` agregan `origen` (`MANUAL`|`AUTOMATICO`) y `codigoLote`; `POST` y `GET /:id` agregan `lote` (`{codigoLote, idEnvio, procesados, rechazados, jsonLote, respuestaMh}` o `null` si el evento fue rechazado). Nuevos `GET /api/contingencia/programacion` (cualquier rol) y `PUT` (ADMIN, `{activo?, hora?}`). Bitácora: `CONTINGENCIA` con `origen` (y `SIN_PENDIENTES` del lote automático); `ACTUALIZAR` con entidad `programacion_contingencia`.
 
 - C1: nuevos `POST /api/contingencia` (ADMIN, 201), `GET /api/contingencia`, `GET /api/contingencia/:id`; `GET /api/dte/:id` agrega `eventoContingencia`; el `jsonDte` de un DTE emitido en contingencia lleva `tipoModelo 2`, `tipoOperacion 2`, `tipoContingencia 1`; `MH_NO_DISPONIBLE` también para el evento de contingencia; bitácora: acción `CONTINGENCIA` (entidad `evento_contingencia`) y `REINTENTO` con `codigoGeneracionEvento`.
 - B1: nuevo `GET /api/health` (sin token); nuevo código de error `DB_NO_DISPONIBLE` (503); estado `BORRADOR` documentado como interno.

@@ -28,6 +28,7 @@ const { enContingencia } = require('../dte/builders/comun');
 const firmador = require('../dte/simuladores/firmador');
 const mh = require('../dte/simuladores/mhRecepcion');
 const mhAnulacion = require('../dte/simuladores/mhAnulacion');
+const mhRegistro = require('../dte/simuladores/mhRegistro');
 
 const TIPOS = {
   '01': { calcular: calculos.calcularFactura, builder: factura01 },
@@ -208,6 +209,8 @@ async function enviarYGuardar({ tipo, tx, q, emisor, usuario, modo, clienteId, c
   let firma = firmador.firmar(jsonDte, modo);
   const respuestaMh = mh.recibir({ codigoGeneracion }, modo);
   if (!respuestaMh) {
+    // timeout: MH sí recibió y selló el original, pero la respuesta no llegó (lo descubre la cola de consultas).
+    if (modo === 'timeout') await mhRegistro.guardarSinRespuesta(q, { codigoGeneracion, tipoDte: tipo, jsonDte, firma });
     // MH no respondió: el DTE se emite en contingencia (modelo diferido) y se vuelve a firmar.
     jsonDte = enContingencia(jsonDte);
     firma = firmador.firmar(jsonDte, modo);
@@ -352,7 +355,46 @@ async function emitirNotaCredito(payload, usuario, modo = 'ok') {
  * @param {string} [codigoEvento]  codigoGeneracion del evento de contingencia que autoriza la transmisión
  * @returns {{estado, selloRecibido, respuestaMh}}
  */
+/**
+ * MH ya tenía el documento (se recibió en un timeout): el DTE queda PROCESADO con el sello original y vuelve
+ * al JSON y la firma que MH recibió (modelo previo). El stock no cambia (CONTINGENCIA ya lo había movido).
+ */
+async function aplicarRegistroMh(q, d, registro, respuestaMh = registro.respuestaMh) {
+  await q(
+    `UPDATE dbo.dte SET estado = 'PROCESADO', sello_recibido = @sello, respuesta_mh = @respuestaMh, json_dte = @jsonDte, firma = @firma
+     WHERE id = @id`,
+    {
+      id: d.id, sello: registro.selloRecibido, respuestaMh: JSON.stringify(respuestaMh),
+      jsonDte: JSON.stringify(registro.jsonDte), firma: JSON.stringify(registro.firma),
+    }
+  );
+  return { estado: 'PROCESADO', selloRecibido: registro.selloRecibido, respuestaMh, firma: registro.firma };
+}
+
 async function transmitir(q, d, usuario, modo = 'ok', codigoEvento = null) {
+  // Si MH ya lo había recibido (timeout), responde con el sello original en vez de duplicarlo.
+  const registro = mh.sinRespuesta(modo) ? null : await mhRegistro.buscar(q, d.codigoGeneracion);
+  if (registro) {
+    const t = await aplicarRegistroMh(q, d, registro, {
+      ...registro.respuestaMh,
+      observaciones: ['MH ya había recibido este documento; se devuelve el sello original (simulado)'],
+    });
+    await registrar(usuario.id, 'REINTENTO', 'dte', d.id, {
+      tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion, resultado: 'PROCESADO',
+      ...(codigoEvento ? { codigoGeneracionEvento: codigoEvento } : {}),
+      mensaje: `DTE-${d.tipoDte} ya estaba en MH (simulado): se recupera el sello original`,
+    }, q);
+    return t;
+  }
+  if (modo === 'timeout') {
+    // MH recibe el JSON actual (en contingencia) pero la respuesta vuelve a perderse.
+    let { jsonDte, firma } = d;
+    if (!jsonDte || !firma) {
+      const r = await q('SELECT json_dte AS jsonDte, firma FROM dbo.dte WHERE id = @id', { id: d.id });
+      ({ jsonDte, firma } = r.recordset[0]);
+    }
+    await mhRegistro.guardarSinRespuesta(q, { codigoGeneracion: d.codigoGeneracion, tipoDte: d.tipoDte, jsonDte: parse(jsonDte), firma: parse(firma) });
+  }
   const respuestaMh = mh.recibir({ codigoGeneracion: d.codigoGeneracion }, modo);
   const estado = respuestaMh ? respuestaMh.estado : 'CONTINGENCIA';
   const selloRecibido = respuestaMh ? respuestaMh.selloRecibido : null;
@@ -385,11 +427,11 @@ async function reintentar(id, usuario, modo = 'ok') {
     if (d.estado !== 'CONTINGENCIA') {
       throw new AppError('ESTADO_INVALIDO', `Solo se reintenta un DTE en CONTINGENCIA; ${d.numeroControl} está en ${d.estado}`, 409);
     }
-    const { estado, selloRecibido, respuestaMh } = await transmitir(q, d, usuario, modo);
+    const { estado, selloRecibido, respuestaMh, firma } = await transmitir(q, d, usuario, modo);
     return respuestaEmision({
       id: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion,
       selloRecibido, estado, fechaEmision: fechaIso(d.fechaEmision), total: Number(d.total),
-      firmador: parse(d.firma), respuestaMh,
+      firmador: firma || parse(d.firma), respuestaMh,
     });
   });
 }
@@ -509,4 +551,5 @@ async function invalidar(id, body, usuario, modo = 'ok') {
 module.exports = {
   emitir, emitirNotaCredito, reintentar, invalidar,
   respuestaEmision, marcaTiempo, fechaIso, parse, pendientesAcreditar, transmitir, nuevoCodigo,
+  cargarDteBloqueado, aplicarRegistroMh,
 };

@@ -11,5 +11,6 @@ router.post('/05', asyncHandler(c.emitir05));
 router.get('/:id', asyncHandler(c.obtener));
 router.post('/:id/invalidar', asyncHandler(c.invalidar));
 router.post('/:id/reintentar', asyncHandler(c.reintentar));
+router.post('/:id/consultar', asyncHandler(c.consultar));
 
 module.exports = router;

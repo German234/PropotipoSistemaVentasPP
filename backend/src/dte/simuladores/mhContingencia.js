@@ -4,10 +4,11 @@
  *   rechazo      → RECHAZADO, sin sello (los DTE siguen en CONTINGENCIA)
  *   contingencia → MH sigue sin responder: null (no se guarda el evento; se vuelve a enviar después)
  */
-const { generarSello, fhProcesamiento } = require('./mhRecepcion');
+const crypto = require('crypto');
+const { generarSello, fhProcesamiento, sinRespuesta } = require('./mhRecepcion');
 
 function recibirEvento({ codigoGeneracion }, modo = 'ok') {
-  if (modo === 'contingencia') return null;
+  if (sinRespuesta(modo)) return null;
   const ahora = new Date();
   const rechazo = modo === 'rechazo';
   return {
@@ -25,4 +26,23 @@ function recibirEvento({ codigoGeneracion }, modo = 'ok') {
   };
 }
 
-module.exports = { recibirEvento };
+/**
+ * Recepción por lote (simulada): tras aceptar el evento, MH recibe los DTE firmados en un solo envío
+ * ({ ambiente, idEnvio, version, nitEmisor, documentos[] }) y responde con el código del lote.
+ * Siempre RECIBIDO: el lote solo se envía cuando MH ya aceptó el evento (MH disponible).
+ */
+function recibirLote({ idEnvio }) {
+  return {
+    version: 2,
+    ambiente: '00',
+    versionApp: 2,
+    estado: 'RECIBIDO',
+    idEnvio,
+    fhProcesamiento: fhProcesamiento(new Date()),
+    codigoLote: crypto.randomUUID().toUpperCase(),
+    codigoMsg: '001',
+    descripcionMsg: 'LOTE RECIBIDO, VALIDADO PROCESAMIENTO EN COLA (SIMULADO)',
+  };
+}
+
+module.exports = { recibirEvento, recibirLote };

@@ -164,6 +164,36 @@ CREATE TABLE dbo.evento_contingencia (
     sello_recibido     VARCHAR(40)   NULL
 );
 GO
+/* C2: origen del lote (manual o cierre del día automático) y recepción por lote de los DTE */
+IF COL_LENGTH('dbo.evento_contingencia', 'origen') IS NULL
+    ALTER TABLE dbo.evento_contingencia ADD origen VARCHAR(10) NOT NULL
+        CONSTRAINT df_evento_cont_origen DEFAULT 'MANUAL'
+        CONSTRAINT ck_evento_cont_origen CHECK (origen IN ('MANUAL','AUTOMATICO'));
+GO
+IF COL_LENGTH('dbo.evento_contingencia', 'codigo_lote') IS NULL
+    ALTER TABLE dbo.evento_contingencia ADD codigo_lote CHAR(36) NULL, respuesta_lote NVARCHAR(MAX) NULL;
+GO
+
+/* C3: seguimiento de la cola de consultas a MH (DTE en CONTINGENCIA) */
+IF COL_LENGTH('dbo.dte', 'consultas_mh') IS NULL
+    ALTER TABLE dbo.dte ADD consultas_mh INT NOT NULL CONSTRAINT df_dte_consultas_mh DEFAULT 0,
+                            ultima_consulta_mh DATETIME2(3) NULL,     -- ms: ordena la cola round-robin
+                            resultado_consulta_mh VARCHAR(15) NULL;   -- ENCONTRADO | NO_ENCONTRADO | SIN_RESPUESTA
+GO
+
+/* ---------- mh_simulado_dte (C3): lo que el MH simulado "recibió" aunque su respuesta no llegara (X-Simular: timeout).
+   Es el lado de Hacienda: la consulta de DTE y los reenvíos lo leen. No es parte del POS real. ---------- */
+IF OBJECT_ID('dbo.mh_simulado_dte', 'U') IS NULL
+CREATE TABLE dbo.mh_simulado_dte (
+    codigo_generacion  CHAR(36)      NOT NULL PRIMARY KEY,
+    tipo_dte           CHAR(2)       NOT NULL,
+    json_dte           NVARCHAR(MAX) NOT NULL,                  -- el JSON que MH recibió (modelo previo)
+    firma              NVARCHAR(MAX) NOT NULL,
+    respuesta_mh       NVARCHAR(MAX) NOT NULL,                  -- respuesta PROCESADO que nunca llegó al POS
+    sello_recibido     VARCHAR(40)   NOT NULL,
+    fecha              DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME()
+);
+GO
 
 /* ---------- evento_contingencia_dte: DTE incluidos en cada evento (detalleDTE) ---------- */
 IF OBJECT_ID('dbo.evento_contingencia_dte', 'U') IS NULL

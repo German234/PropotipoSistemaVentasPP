@@ -141,6 +141,8 @@ var api = (function () {
       notaCredito: function (payload, simular) { return request('POST', '/dte/05', { body: payload, simular: simular }); },
       invalidar: function (id, body, simular) { return request('POST', '/dte/' + id + '/invalidar', { body: body, simular: simular }); },
       reintentar: function (id, simular) { return request('POST', '/dte/' + id + '/reintentar', { simular: simular }); },
+      /** C3: consulta de DTE en MH (solo DTE en CONTINGENCIA) → { resultado: ENCONTRADO|NO_ENCONTRADO|SIN_RESPUESTA, estado, ... } */
+      consultar: function (id, simular) { return request('POST', '/dte/' + id + '/consultar', { simular: simular }); },
       listar: function (filtros) { return request('GET', '/dte', { query: filtros }); },     // {tipo, estado, desde, hasta, clienteId}
       obtener: function (id) { return request('GET', '/dte/' + id); }
     },
@@ -149,7 +151,15 @@ var api = (function () {
       /** body {dteIds?, motivo?} (ADMIN); simular aplica al evento */
       enviar: function (body, simular) { return request('POST', '/contingencia', { body: body, simular: simular }); },
       listar: function () { return request('GET', '/contingencia'); },
-      obtener: function (id) { return request('GET', '/contingencia/' + id); }
+      obtener: function (id) { return request('GET', '/contingencia/' + id); },
+      /** C2: lote automático del cierre del día → { activo, hora, proximaEjecucion, ultimaEjecucion, pendientes } */
+      programacion: function () { return request('GET', '/contingencia/programacion'); },
+      /** body { activo?, hora? "HH:mm" } (ADMIN) */
+      programar: function (body) { return request('PUT', '/contingencia/programacion', { body: body }); },
+      /** C3: cola de consultas a MH → { activo, intervaloSeg, proximaConsulta, ultimaConsulta, cola[] } */
+      consultas: function () { return request('GET', '/contingencia/consultas'); },
+      /** body { activo?, intervaloSeg? 10–3600 } (ADMIN) */
+      configurarConsultas: function (body) { return request('PUT', '/contingencia/consultas', { body: body }); }
     },
 
     bitacora: function (filtros) { return request('GET', '/bitacora', { query: filtros }); } // {accion, entidad, dteId, usuario, desde, hasta, limite}

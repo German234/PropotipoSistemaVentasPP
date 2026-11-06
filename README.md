@@ -55,6 +55,10 @@ Edita `backend/.env`:
 | `DB_TRUST_CERT` | `true` en local (certificado autofirmado) |
 | `JWT_SECRET` | Cualquier texto largo y aleatorio (el servidor no arranca sin él) |
 | `PORT` | Puerto de la aplicación, por defecto `3000` |
+| `CONTINGENCIA_LOTE_HORA` | Hora (`HH:mm`) del lote automático de contingencia del cierre del día, por defecto `23:55` |
+| `CONTINGENCIA_LOTE_ACTIVO` | `1` (por defecto) o `0` para desactivar el lote automático |
+| `CONSULTA_MH_INTERVALO_SEG` | Cada cuántos segundos la cola de consultas pregunta a MH por **un** DTE en contingencia (10–3600, por defecto `60`) |
+| `CONSULTA_MH_ACTIVO` | `1` (por defecto) o `0` para desactivar la cola de consultas |
 
 ### 3. Ejecutar
 
@@ -75,8 +79,9 @@ Abre **http://localhost:3000**. Para comprobar la conexión, abre http://localho
 ## Uso rápido
 
 - **Nueva venta:** elige Factura 01 o CCF 03, el cliente y los productos, y confirma. El modal muestra el estado de MH, el número de control, el código de generación, el sello y el JSON del DTE.
-- **Simular MH** (solo ADMIN): fuerza `OK`, `Rechazo` o `Contingencia` para la demo (envía el header `X-Simular`).
+- **Simular MH** (solo ADMIN): fuerza `OK`, `Rechazo`, `Contingencia` o `Timeout` para la demo (envía el header `X-Simular`). *Timeout* = MH sí recibió el documento pero la respuesta se perdió: queda en contingencia hasta que la cola de consultas lo encuentra en MH.
 - **Transacciones:** filtros, detalle, Nota de crédito (sobre un CCF), Anular y Reintentar envío.
+- **Contingencia** (menú lateral o Administración → Contingencia, solo ADMIN): cola de DTE que MH no recibió, **📦 Enviar lote ahora** (evento de contingencia + recepción por lote con todos los pendientes), reintento uno por uno, historial de lotes, la programación del **lote automático del cierre del día** (hora y activo) y la **cola de consultas a MH**, que durante el día pregunta a Hacienda por un documento a la vez si de verdad lo recibió (los que sí, quedan aceptados con su sello).
 - **Administración → Bitácora:** auditoría con filtros y exportación a CSV.
 
 El guion de la demo de 5 minutos está en [docs/DEMO.md](docs/DEMO.md).
@@ -88,6 +93,17 @@ Borra todos los DTE, los eventos y la bitácora, pone los correlativos en 0 y re
 ```bash
 sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql
 ```
+
+## Pruebas automatizadas
+
+```bash
+cd backend
+npm test               # 309 pruebas: unitarias + integración (~25 s)
+npm run test:unit      # sin BD
+npm run test:coverage  # reporte en backend/coverage/index.html
+```
+
+Las pruebas de integración usan una BD aparte, `BatallonAtlacatl_Test`, que se crea y siembra sola con los scripts de `db/` (requiere SQL Server y `backend/.env`; nunca tocan la BD de la demo). Detalle y matriz de requisitos → pruebas en [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ## Modo sin backend (mocks)
 
