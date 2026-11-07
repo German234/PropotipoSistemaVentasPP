@@ -5,18 +5,19 @@
 const c = require('./comun');
 const { numeroALetras } = require('../numeroALetras');
 
-/** Receptor 01: tipoDocumento 36 (NIT) si el cliente tiene NIT; si no, sin documento. */
+/** Receptor 01: documento del cliente (CAT-022; NIT "36" si solo tiene nit); dirección solo si la tiene. */
 function receptor(cliente, emisor) {
   if (!cliente) return null;
+  const tipoDoc = cliente.tipoDocumento || (cliente.nit ? '36' : null);
   return {
-    tipoDocumento: cliente.nit ? '36' : null,
-    numDocumento: cliente.nit || null,
+    tipoDocumento: tipoDoc,
+    numDocumento: tipoDoc ? c.numDocumento(tipoDoc, cliente.numDocumento || cliente.nit) : null,
     nrc: cliente.nrc || null,
     nombre: cliente.nombre,
     codActividad: cliente.codActividad || null,
     descActividad: cliente.descActividad || null,
     direccion: cliente.direccion ? c.direccionCliente(cliente, emisor) : null,
-    telefono: null,
+    telefono: cliente.telefono || null,
     correo: cliente.correo || null,
   };
 }

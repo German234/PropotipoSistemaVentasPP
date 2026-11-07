@@ -14,12 +14,16 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/productos', require('./routes/productos'));
 app.use('/api/clientes', require('./routes/clientes'));
 app.use('/api/emisor', require('./routes/emisor'));
+app.use('/api/catalogos', require('./routes/catalogos'));
 app.use('/api/dte', require('./routes/dte'));
 app.use('/api/contingencia', require('./routes/contingencia'));
 app.use('/api/bitacora', require('./routes/bitacora'));
 
 // Rutas /api no definidas → 404 con formato estándar
 app.use('/api', noEncontrado);
+
+// Catálogos MH compartidos con el frontend (global CATALOGOS_MH; lo usan los mocks)
+app.get('/js/catalogos-mh.js', (req, res) => res.type('application/javascript').sendFile(path.join(__dirname, 'dte', 'catalogosMh.js')));
 
 // Frontend estático (mismo origen que la API)
 app.use(express.static(path.join(__dirname, '..', '..', 'frontend')));

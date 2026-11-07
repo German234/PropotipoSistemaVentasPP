@@ -20,6 +20,8 @@
 - **Q1 Pruebas automatizadas — HECHO (2026-11-06).** Jest + Supertest + Ajv: 256 pruebas al cerrar Q1, 281 tras C2, 309 tras C3 (7 suites unitarias, 11 de integración contra la BD aislada `BatallonAtlacatl_Test`), cobertura ≈ 99 % de líneas. Flujos 01/03/05, rechazo, contingencia y reintento, evento de contingencia (C1), invalidación. Encontró y se corrigió un bug de `redondear2` (NC → 500). Sin cambios de contrato.
 - **C2 Lotes de contingencia — HECHO (2026-11-06).** Lote manual ("Enviar lote ahora" con todos los pendientes) y lote automático del cierre del día (hora configurable); recepción por lote simulada con `codigoLote`; panel *Contingencia* rehecho y accesible desde el menú del POS. 281 pruebas en verde. Cambio de contrato (ver abajo).
 - **C3 Cola de consultas a MH — HECHO (2026-11-06).** `X-Simular: timeout` (MH recibió pero la respuesta se perdió); durante el día se consulta en MH un DTE en contingencia por turno (round-robin, intervalo configurable) y los que MH sí tenía quedan PROCESADO con su sello original; consulta puntual `POST /api/dte/:id/consultar`. 309 pruebas en verde. Cambio de contrato (ver abajo).
+- **P1 PDF real del DTE — HECHO (2026-11-06).** `GET /api/dte/:id/pdf` genera la representación gráfica con la plantilla del PDF de ejemplo; "Descargar PDF" (modal de correo en Transacciones) la descarga. Cambio de contrato (ver abajo).
+- **P2 Datos completos del cliente con catálogos MH — HECHO (2026-11-06).** El formulario de clientes selecciona departamento → municipio → distrito (CAT-012/013, reforma 2024) y tipo de documento (CAT-022); captura nombre comercial y teléfono; el backend valida los códigos y los copia al receptor del DTE. Nuevo `GET /api/catalogos`. Cambio de contrato (ver abajo).
 - ✅ **MVP COMPLETO (2026-11-04).** Backend B1–B4 + frontend F1–F4 integrados: login con roles, catálogos, emisión 01/03/05, invalidación, contingencia y reintento, transacciones y bitácora, todo contra SQL Server. Guion de demo verificado de punta a punta.
 
 ## Mapa de archivos
@@ -79,7 +81,11 @@
 | `frontend/js/app.js` | Lógica de UI (globales para los `onclick` inline). F2: sesión, inventario y clientes; F3: venta y emisión 01/03; F4: transacciones, NC 05, anular, reintentar y bitácora contra `api.*`; C1: panel Contingencia. Panel gerencial (salvo el KPI de contingencia), usuarios y config del admin siguen fijos |
 | `frontend/js/api.js` | Cliente HTTP: `API_CONFIG` (`BASE_URL:'/api'`, `USE_MOCK: false` desde I1), `ApiError`, `api.*` por endpoint, token en localStorage |
 | `frontend/js/mocks.js` | `MockApi.handle(method, path, query, body, headers)` → `{status, body}`: backend simulado en memoria con la forma exacta de `docs/API.md` (seed, firmador, respuestaMh, X-Simular) |
-| `frontend/js/pdf-data.js` | `var PDF_DATA` = PDF de ejemplo en base64 (226 KB) que usa `downloadPdf()`. No abrir |
+| `frontend/js/pdf-data.js` | `var PDF_DATA` = PDF de ejemplo en base64 (226 KB); `downloadPdf()` solo lo usa en modo mock. Es la plantilla de `dte/pdf.js`. No abrir |
+| `backend/src/dte/catalogosMh.js` | P2: catálogos MH (UMD): `departamentos` (CAT-012 → CAT-013 → distritos), `tiposDocumento` (CAT-022), `buscar(dep, mun, dis)`, `textoDireccion(dir)`. Express lo sirve como `/js/catalogos-mh.js` (global `CATALOGOS_MH`). Única fuente de esos códigos |
+| `backend/src/controllers/catalogosController.js`, `routes/catalogos.js` | P2: `GET /api/catalogos` (cualquier rol) |
+| `backend/src/dte/pdf.js` | P1: `generar(dte)` (resultado de `dteConsultasService.obtener`) → Buffer PDF con la plantilla de `pdf-data.js` (PDFKit + qrcode) |
+| `backend/tests/integration/pdf.test.js` | P1: `GET /api/dte/:id/pdf` (01, 01 contingencia, 03, 05, 401, 404). `PDF_OUT=<carpeta>` guarda los PDF para revisarlos |
 | `schemas-mh/` | Esquemas JSON oficiales MH (01 v2, 03 v4, 05 v4, invalidación v3, contingencia v4). Solo referencia |
 | `.gitignore` | Ignora node_modules y .env |
 | `README.md` | Instalación (scripts de `db/`, `.env`, `npm start`), usuarios de prueba, reinicio de demo, modo mocks, problemas frecuentes |
@@ -264,6 +270,8 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 
 ## Cambios de contrato
 
+- P2: clientes con `nombreComercial`, `tipoDocumento`, `numDocumento`, `telefono` y `direccion` **objeto** `{departamento, municipio, distrito, complemento}` con códigos MH validados (antes texto libre); CONTRIBUYENTE exige dirección completa y `codActividad` de 5–6 dígitos (antes 2–6). Nuevo `GET /api/catalogos`. `GET /api/emisor` agrega `direccion.distrito` (seed: municipio 23 San Salvador Centro, distrito 14). El receptor del DTE lleva documento, teléfono, nombre comercial (03) y la dirección del cliente.
+- P1: nuevo `GET /api/dte/:id/pdf` (cualquier rol) → `application/pdf` (no JSON; errores sí en JSON estándar).
 - C3: `X-Simular` admite `timeout` (para el POS = contingencia; MH sí guardó el DTE; en eventos = sin respuesta). Nuevos `POST /api/dte/:id/consultar` (cualquier rol), `GET /api/contingencia/consultas` (cualquier rol) y `PUT` (ADMIN, `{activo?, intervaloSeg?}`). `GET /api/dte/:id` agrega `consultaMh`. Reintento/lote de un DTE que MH ya tenía → sello original (con `observaciones`) y JSON de modelo previo. Bitácora: acción `CONSULTA_MH`; `ACTUALIZAR` con entidad `consultas_mh`.
 - C2: `POST/GET /api/contingencia` y `GET /:id` agregan `origen` (`MANUAL`|`AUTOMATICO`) y `codigoLote`; `POST` y `GET /:id` agregan `lote` (`{codigoLote, idEnvio, procesados, rechazados, jsonLote, respuestaMh}` o `null` si el evento fue rechazado). Nuevos `GET /api/contingencia/programacion` (cualquier rol) y `PUT` (ADMIN, `{activo?, hora?}`). Bitácora: `CONTINGENCIA` con `origen` (y `SIN_PENDIENTES` del lote automático); `ACTUALIZAR` con entidad `programacion_contingencia`.
 
@@ -273,9 +281,22 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 - B3: emisión responde 201; `X-Simular` inválido → 400; contingencia descuenta stock; `jsonDte` sin `extension` (esquemas MH), 01 `version 2`, 03 `version 4`, direcciones con `distrito`; `clienteId` del ejemplo 03 = 3 (id real del seed).
 - B2: nuevo código `SIN_PERMISO` (403); campo `activo` en productos y clientes; `GET /:id` en productos y clientes; `?incluirInactivos=1`; PUT parcial; POST responde 201; nit/nrc normalizados a dígitos; acciones de bitácora `LOGIN_FALLIDO`, `CREAR`, `ACTUALIZAR`.
 
+- [x] **P1 — PDF real del DTE (2026-11-06).**
+  - Archivos: nuevo `backend/src/dte/pdf.js`, `tests/integration/pdf.test.js`; modificados `routes/dte.js` + `controllers/dteController.js` (`pdf`), `package.json` (`pdfkit`, `qrcode`), `frontend/js/api.js` (`api.dte.pdf(id)` → Blob), `frontend/js/app.js` (`openEmailModal(numeroControl, id)`; `downloadPdf()` pide el PDF real y cae a `PDF_DATA` en modo mock), `docs/API.md`.
+  - Decisiones: el PDF se genera en el backend desde `jsonDte` (lo transmitido), carta, una página salvo muchos ítems (pagina con cabecera repetida y "Página X de Y"); la marca del encabezado usa el `nombreComercial` del emisor con el logo de la plantilla; QR = URL de consulta pública de MH (ambiente, codGen, fechaEmi); NIT/NRC/teléfono con guiones; sello de agua INVALIDADO/RECHAZADO/CONTINGENCIA.
+  - Verificado: prueba de integración en verde y revisión visual de 01, 01 en contingencia, 03 y 05.
+  - Pendiente: el envío por correo sigue simulado.
+
+- [x] **P2 — Datos completos del cliente con catálogos MH (2026-11-06).**
+  - Archivos nuevos: `dte/catalogosMh.js`, `controllers/catalogosController.js`, `routes/catalogos.js`. Modificados: `db/01_schema.sql` (clientes: `tipo_documento`, `num_documento`, `nombre_comercial`, `telefono`, `direccion_departamento/municipio/distrito`; emisor: `direccion_distrito`; **aplicado a la BD local**), `db/02_seed.sql` (emisor 06/23/14 y clientes del seed completos, también si ya existían), `services/clientesService.js` (validación contra el catálogo; exporta `COLS`/`aCliente`), `services/dteService.js` (`cargarCliente` con la misma forma), `services/emisorService.js`, `builders/comun.js` (`direccionCliente` usa los códigos del cliente; `numDocumento` DUI con guion), `factura01.js`, `ccf03.js`, `dte/pdf.js` (dirección con nombres), `app.js` (ruta + archivo estático), `frontend/index.html`, `js/app.js`, `js/api.js` (`api.catalogos()`), `js/mocks.js`, pruebas (`catalogos`, `dte01`, `dte03`, `builders`, fixtures), `docs/API.md`.
+  - Decisiones: los catálogos viven en código (no en BD) porque son fijos; un solo archivo UMD para backend y mocks. Distrito = código del antiguo municipio dentro del departamento. Clientes anteriores a P2 (solo texto) siguen funcionando: el DTE usa los códigos del emisor. Actividad económica (CAT-019, ~770 códigos) sigue como código + descripción libres.
+  - UI: selects encadenados Departamento → Municipio → Distrito + Complemento (obligatorios para contribuyente); tipo/número de documento para consumidor; nombre comercial y teléfono; columnas Documento y Ubicación en la lista; resumen del cliente en Nueva venta con documento, teléfono y dirección completa.
+  - Verificado: 326/326 pruebas; mocks emitiendo 01/03 válidos contra `fe-f-v2`/`fe-ccf-v4`; recorrido en Edge headless contra la API real (crear contribuyente en San Miguel Centro, CCF con receptor 12/22/17, PDF) sin errores JS.
+  - Pendiente: edición de clientes en la UI; validar los códigos de distrito contra el CAT oficial vigente del MH.
+
 ## Pendientes
 
 - **Antes de la demo:** la BD local tiene los datos de las pruebas de C1 (DTE 3–10, 6 eventos de contingencia, bitácora y stock de P001, P002, P003, P005, P006 movidos). Ejecutar `sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql` para que los números de control empiecen en 001, como en `docs/DEMO.md`.
-- Fuera del MVP (simulado o fijo en la UI): panel gerencial, usuarios y configuración del admin, borradores, envío por correo/PDF, anulación tipo 1/3 en la UI, edición de clientes en la UI, descuentos por línea en la UI.
+- Fuera del MVP (simulado o fijo en la UI): panel gerencial, usuarios y configuración del admin, borradores, envío por correo, anulación tipo 1/3 en la UI, edición de clientes en la UI, descuentos por línea en la UI.
 - ~~`/api/health` en verde con `sa`~~ (hecho en B3).
 - Ninguno en backend. Opcional: reintentar invalidación más tarde si MH no responde (hoy el cliente simplemente repite la llamada).

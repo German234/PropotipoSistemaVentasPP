@@ -12,9 +12,9 @@ const receptor = (cliente, emisor) => ({
   nombre: cliente.nombre,
   codActividad: cliente.codActividad,
   descActividad: cliente.descActividad,
-  nombreComercial: null,
+  nombreComercial: cliente.nombreComercial || null,
   direccion: c.direccionCliente(cliente, emisor),
-  telefono: null,
+  telefono: cliente.telefono || null,
   correo: cliente.correo || null,
 });
 

@@ -275,6 +275,12 @@
   .cli-resumen{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin:-6px 0 14px;font-size:12.5px}
   .cli-resumen div{display:flex;gap:8px;padding:2px 0}
   .cli-resumen span{color:var(--muted);min-width:70px}
+  .cli-dir-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 8px;padding-top:10px;border-top:1px solid var(--border)}
+  select:disabled,input:disabled{opacity:.6;cursor:not-allowed}
+  /* P2: que los selects con nombres largos no ensanchen la columna del formulario */
+  .sale-grid > *, .form-grid > *{min-width:0}
+  .field input, .field select{max-width:100%}
+  #v-clientes .card:first-child{overflow-x:auto}
   .sim-mh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding:8px 10px;border:1px dashed var(--warn);border-radius:var(--radius-sm);background:var(--warn-bg);font-size:12.5px;font-weight:500;color:var(--warn)}
   .sim-mh select.pill{padding:5px 10px;font-size:12.5px}
   .modal.dr-modal{max-width:760px}
@@ -631,7 +637,7 @@
                 </select></div>
               </div>
               <table>
-                <thead><tr><th>Nombre</th><th>Tipo</th><th>NIT</th><th>NRC</th><th>Correo</th></tr></thead>
+                <thead><tr><th>Nombre</th><th>Tipo</th><th>Documento</th><th>NRC</th><th>Ubicación</th><th>Correo</th></tr></thead>
                 <tbody id="cli-tbody"></tbody>
               </table>
             </div>
@@ -641,18 +647,30 @@
                 <option value="CONSUMIDOR">Consumidor final</option><option value="CONTRIBUYENTE">Contribuyente</option>
               </select></div>
               <div class="field"><label>Nombre o razón social <span class="req">*</span></label><input id="cli-nombre" placeholder="Ej. Juan Pérez"></div>
+              <div class="field"><label>Nombre comercial</label><input id="cli-comercial" placeholder="Opcional"></div>
+              <div id="cli-consumidor-doc" class="form-grid">
+                <div class="field"><label>Tipo de documento</label><select id="cli-tipodoc" onchange="toggleNumDocumento()"></select></div>
+                <div class="field"><label>Número de documento</label><input id="cli-numdoc" placeholder="Ej. 01234567-8" disabled></div>
+              </div>
               <div id="cli-contribuyente" style="display:none">
                 <div class="form-grid">
                   <div class="field"><label>NIT <span class="req">*</span></label><input id="cli-nit" placeholder="9 o 14 dígitos"></div>
                   <div class="field"><label>NRC <span class="req">*</span></label><input id="cli-nrc" placeholder="1 a 8 dígitos"></div>
                 </div>
                 <div class="form-grid">
-                  <div class="field"><label>Cód. actividad <span class="req">*</span></label><input id="cli-codact" placeholder="Ej. 46900"></div>
+                  <div class="field"><label>Cód. actividad <span class="req">*</span></label><input id="cli-codact" placeholder="Ej. 46900 (CAT-019)"></div>
                   <div class="field"><label>Actividad económica <span class="req">*</span></label><input id="cli-descact" placeholder="Descripción"></div>
                 </div>
               </div>
-              <div class="field"><label>Dirección</label><input id="cli-direccion" placeholder="Ej. San Salvador, Col. Escalón"></div>
-              <div class="field"><label>Correo</label><input id="cli-correo" type="email" placeholder="cliente@correo.com"></div>
+              <div class="form-grid">
+                <div class="field"><label>Teléfono</label><input id="cli-telefono" placeholder="Ej. 2222-0000"></div>
+                <div class="field"><label>Correo</label><input id="cli-correo" type="email" placeholder="cliente@correo.com"></div>
+              </div>
+              <div class="cli-dir-title">Dirección (catálogo MH) <span class="req" id="cli-dir-req" style="display:none">*</span></div>
+              <div class="field"><label>Departamento</label><select id="cli-depto" onchange="cambiarDepartamento()"></select></div>
+              <div class="field"><label>Municipio</label><select id="cli-municipio" onchange="cambiarMunicipio()" disabled></select></div>
+              <div class="field"><label>Distrito</label><select id="cli-distrito" disabled></select></div>
+              <div class="field"><label>Complemento</label><input id="cli-complemento" placeholder="Colonia, calle, número de casa…"></div>
               <button class="btn btn-primary btn-block" id="cli-save" style="margin-top:6px" onclick="crearCliente()">+ Guardar cliente</button>
             </div>
           </div>
@@ -1064,6 +1082,7 @@
 <div class="scrim" id="scrim" onclick="closeSidebars()"></div>
 <div class="toast" id="toast"><span class="tick" id="toast-icon">✓</span><span id="toast-msg"></span></div>
 
+<script src="js/catalogos-mh.js"></script>
 <script src="js/mocks.js"></script>
 <script src="js/api.js"></script>
 <script src="js/pdf-data.js"></script>

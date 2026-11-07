@@ -18,6 +18,7 @@ const { registrar } = require('../utils/bitacora');
 const { redondear2 } = require('../utils/dinero');
 const v = require('../utils/validar');
 const emisorService = require('./emisorService');
+const clientes = require('./clientesService');
 const calculos = require('../dte/calculos');
 const { siguienteNumeroControl } = require('../dte/correlativo');
 const factura01 = require('../dte/builders/factura01');
@@ -89,13 +90,8 @@ function validarPayload(tipo, body) {
 /** Cliente dentro de la transacción. 03: CONTRIBUYENTE con NIT, NRC y actividad. */
 async function cargarCliente(q, tipo, clienteId) {
   if (!clienteId) return null;
-  const r = await q(
-    `SELECT id, tipo, nombre, nit, nrc, cod_actividad AS codActividad, desc_actividad AS descActividad,
-            direccion, correo, activo
-     FROM dbo.clientes WHERE id = @id`,
-    { id: clienteId }
-  );
-  const c = r.recordset[0];
+  const r = await q(`SELECT ${clientes.COLS} FROM dbo.clientes WHERE id = @id`, { id: clienteId });
+  const c = r.recordset[0] && clientes.aCliente(r.recordset[0]);
   if (!c) throw new AppError('NO_ENCONTRADO', `Cliente ${clienteId} no existe`, 404);
   if (!c.activo) v.falla(`El cliente ${c.nombre} está inactivo`);
   if (tipo === '03') {

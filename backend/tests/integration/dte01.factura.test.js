@@ -80,7 +80,11 @@ describe('01 Factura · variantes', () => {
     expect(r.body.data.total).toBe(9.16);
     const d = await t.detalle(r.body.data.id);
     expect(d.jsonDte).toCumplirEsquemaMh('01');
-    expect(d.jsonDte.receptor).toMatchObject({ nombre: 'Juan Pérez', tipoDocumento: null, numDocumento: null });
+    // P2: Juan tiene DUI (13, con guion en el JSON) y dirección con códigos MH de Antiguo Cuscatlán
+    expect(d.jsonDte.receptor).toMatchObject({
+      nombre: 'Juan Pérez', tipoDocumento: '13', numDocumento: '01234567-8', telefono: '77778888',
+      direccion: { departamento: '05', municipio: '26', distrito: '01', complemento: 'Residencial Las Colinas, casa 4' },
+    });
     expect(d.jsonDte.resumen).toMatchObject({ totalDescu: 0.5, totalIva: 1.05, totalLetras: 'NUEVE 16/100 USD' });
     expect(d.cliente).toMatchObject({ id: t.cli.juan.id, tipo: 'CONSUMIDOR' });
   });

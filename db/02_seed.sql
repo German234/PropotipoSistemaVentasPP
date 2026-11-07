@@ -19,12 +19,16 @@ IF NOT EXISTS (SELECT 1 FROM dbo.usuarios WHERE usuario = 'vendedor')
 /* ---------- emisor ---------- */
 IF NOT EXISTS (SELECT 1 FROM dbo.emisor WHERE id = 1)
     INSERT INTO dbo.emisor (id, nit, nrc, nombre, cod_actividad, desc_actividad, nombre_comercial,
-                            tipo_establecimiento, direccion_departamento, direccion_municipio, direccion_complemento,
-                            telefono, correo, cod_estable_mh, cod_punto_venta_mh)
+                            tipo_establecimiento, direccion_departamento, direccion_municipio, direccion_distrito,
+                            direccion_complemento, telefono, correo, cod_estable_mh, cod_punto_venta_mh)
     VALUES (1, '06140101001010', '100001', N'Batallón Atlacatl, S.A. de C.V.', '47190',
             N'Venta al por menor en comercios no especializados', N'Tienda Atlacatl',
-            '02', '06', '14', N'Calle Principal #1, San Salvador',
+            '02', '06', '23', '14', N'Calle Principal #1, San Salvador',
             '22220000', N'facturas@atlacatl.com.sv', 'M001', 'P001');
+
+/* P2: códigos de la reforma 2024 (San Salvador Centro / distrito San Salvador) en un emisor ya cargado */
+UPDATE dbo.emisor SET direccion_municipio = '23', direccion_distrito = '14'
+WHERE id = 1 AND direccion_distrito IS NULL AND direccion_departamento = '06' AND direccion_municipio = '14';
 
 /* ---------- productos (precio SIN IVA) ---------- */
 INSERT INTO dbo.productos (codigo, descripcion, precio, stock, unidad)
@@ -43,22 +47,40 @@ FROM (VALUES
 ) AS v(codigo, descripcion, precio, stock)
 WHERE NOT EXISTS (SELECT 1 FROM dbo.productos p WHERE p.codigo = v.codigo);
 
-/* ---------- clientes ---------- */
+/* ---------- clientes ----------
+   direccion = complemento; departamento/municipio/distrito con códigos MH (backend/src/dte/catalogosMh.js) */
 INSERT INTO dbo.clientes (tipo, nombre, nit, nrc, cod_actividad, desc_actividad, direccion, correo)
 SELECT v.tipo, v.nombre, v.nit, v.nrc, v.cod_actividad, v.desc_actividad, v.direccion, v.correo
 FROM (VALUES
     ('CONSUMIDOR',    N'Juan Pérez',                           NULL,             NULL,      NULL,    NULL,
-                      N'Antiguo Cuscatlán, La Libertad',       N'juan.perez@correo.com'),
+                      N'Residencial Las Colinas, casa 4',      N'juan.perez@correo.com'),
     ('CONSUMIDOR',    N'María López',                          NULL,             NULL,      NULL,    NULL,
-                      N'Santa Tecla, La Libertad',             N'maria.lopez@correo.com'),
+                      N'Calle Chiltiupán, Ciudad Merliot',     N'maria.lopez@correo.com'),
     ('CONTRIBUYENTE', N'Distribuidora El Roble, S.A. de C.V.', '06142301001234', '1234567', '46900',
                       N'Venta al por mayor de otros productos',
-                      N'Colonia Escalón, San Salvador',        N'compras@elroble.com.sv'),
+                      N'Colonia Escalón, Paseo General Escalón #3500', N'compras@elroble.com.sv'),
     ('CONTRIBUYENTE', N'Librería Cuscatlán, S.A. de C.V.',     '06140512991021', '2345678', '47610',
                       N'Venta al por menor de libros, periódicos y artículos de papelería',
-                      N'Centro de Gobierno, San Salvador',     N'admin@libreriacuscatlan.com.sv')
+                      N'Centro de Gobierno, Edificio B, local 2', N'admin@libreriacuscatlan.com.sv')
 ) AS v(tipo, nombre, nit, nrc, cod_actividad, desc_actividad, direccion, correo)
 WHERE NOT EXISTS (SELECT 1 FROM dbo.clientes c WHERE c.nombre = v.nombre);
+
+/* P2: datos completos del receptor (también completa los clientes cargados antes de P2) */
+UPDATE c SET c.tipo_documento = v.tipo_documento, c.num_documento = v.num_documento,
+             c.nombre_comercial = v.nombre_comercial, c.telefono = v.telefono, c.direccion = v.direccion,
+             c.direccion_departamento = v.dep, c.direccion_municipio = v.mun, c.direccion_distrito = v.dis
+FROM dbo.clientes c
+JOIN (VALUES
+    (N'Juan Pérez',                           '13', '012345678',      NULL,                     '77778888',
+     N'Residencial Las Colinas, casa 4',              '05', '26', '01'),
+    (N'María López',                          NULL, NULL,             NULL,                     NULL,
+     N'Calle Chiltiupán, Ciudad Merliot',             '05', '28', '10'),
+    (N'Distribuidora El Roble, S.A. de C.V.', '36', '06142301001234', N'El Roble',             '22605000',
+     N'Colonia Escalón, Paseo General Escalón #3500', '06', '23', '14'),
+    (N'Librería Cuscatlán, S.A. de C.V.',     '36', '06140512991021', N'Librería Cuscatlán',   '22214400',
+     N'Centro de Gobierno, Edificio B, local 2',      '06', '23', '14')
+) AS v(nombre, tipo_documento, num_documento, nombre_comercial, telefono, direccion, dep, mun, dis) ON v.nombre = c.nombre
+WHERE c.direccion_departamento IS NULL;
 
 /* ---------- correlativos ---------- */
 INSERT INTO dbo.correlativos (tipo_dte, ultimo)

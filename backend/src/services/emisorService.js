@@ -17,6 +17,7 @@ async function obtener() {
     direccion: {
       departamento: e.direccion_departamento,
       municipio: e.direccion_municipio,
+      distrito: e.direccion_distrito,
       complemento: e.direccion_complemento,
     },
     telefono: e.telefono,

@@ -49,14 +49,14 @@
     if(av){ av.textContent = iniciales(usuario.nombre); av.title = usuario.nombre+' ('+usuario.rol+')'; }
     limpiarFormProducto();
     show('app-vendedor'); setPanelById('vendedor','v-venta'); closeSidebars();
-    cargarProductos(); buscarClientes(); cargarClientesVenta(); contarContingencia();
+    cargarProductos(); buscarClientes(); cargarClientesVenta(); contarContingencia(); cargarCatalogos();
     ['v-simular','h-simular','ct-simular'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value='ok'; });
   }
 
   function cerrarSesionLocal(){
     usuarioActual = null;
     document.body.classList.remove('rol-admin');
-    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null;
+    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null; catalogosMh = null;
     closeDteResult(); closeAnular(); closeNotaCredito();
     dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; ctProg = null; ctConsultas = null; actualizarColaContingencia(0); renderHistorial(); renderBitacora(); renderContingencia();
     var ctm = document.getElementById('ct-motivo'); if(ctm) ctm.value = '';
@@ -221,16 +221,70 @@
     }, 250);
   }
 
+  /* ===== P2: catálogos MH (departamento → municipio → distrito, tipo de documento) ===== */
+  var catalogosMh = null;   // respuesta de GET /api/catalogos
+  function cargarCatalogos(){
+    if(catalogosMh) return Promise.resolve(catalogosMh);
+    return api.catalogos().then(function(c){ catalogosMh = c; llenarSelectsCliente(); return c; }).catch(alertaError);
+  }
+  function _opts(lista, vacio){
+    return '<option value="">'+vacio+'</option>' + lista.map(function(x){
+      return '<option value="'+_h(x.codigo)+'">'+_h(x.nombre)+'</option>';
+    }).join('');
+  }
+  function _depto(cod){ return (catalogosMh ? catalogosMh.departamentos : []).filter(function(d){ return d.codigo===cod; })[0] || null; }
+  function _municipio(dep, cod){ return dep ? dep.municipios.filter(function(m){ return m.codigo===cod; })[0] || null : null; }
+  function llenarSelectsCliente(){
+    if(!catalogosMh) return;
+    document.getElementById('cli-tipodoc').innerHTML = _opts(catalogosMh.tiposDocumento, 'Sin documento');
+    document.getElementById('cli-depto').innerHTML = _opts(catalogosMh.departamentos, 'Selecciona un departamento');
+    cambiarDepartamento();
+    toggleNumDocumento();
+  }
+  function cambiarDepartamento(){
+    var dep = _depto(document.getElementById('cli-depto').value);
+    var sm = document.getElementById('cli-municipio');
+    sm.innerHTML = _opts(dep ? dep.municipios : [], dep ? 'Selecciona un municipio' : '—');
+    sm.disabled = !dep;
+    cambiarMunicipio();
+  }
+  function cambiarMunicipio(){
+    var dep = _depto(document.getElementById('cli-depto').value);
+    var mun = _municipio(dep, document.getElementById('cli-municipio').value);
+    var sd = document.getElementById('cli-distrito');
+    sd.innerHTML = _opts(mun ? mun.distritos : [], mun ? 'Selecciona un distrito' : '—');
+    sd.disabled = !mun;
+  }
+  function toggleNumDocumento(){
+    var tipo = document.getElementById('cli-tipodoc').value;
+    var inp = document.getElementById('cli-numdoc');
+    inp.disabled = !tipo;
+    if(!tipo) inp.value = '';
+    inp.placeholder = {'36':'NIT: 9 o 14 dígitos','13':'DUI: 01234567-8','03':'Número de pasaporte','02':'Número de carnet','37':'Número de documento'}[tipo] || '—';
+  }
+  /** "Distrito, Municipio, Departamento" a partir de los códigos (corto = sin departamento, para la tabla). */
+  function textoUbicacion(dir, corto){
+    if(!dir || !dir.departamento || typeof CATALOGOS_MH==='undefined') return dir && dir.complemento ? dir.complemento : '';
+    var b = CATALOGOS_MH.buscar(dir.departamento, dir.municipio, dir.distrito);
+    return [b.distrito && b.distrito.nombre, b.municipio && b.municipio.nombre, !corto && b.departamento && b.departamento.nombre].filter(Boolean).join(', ');
+  }
+  function textoDocumento(c){
+    if(!c.tipoDocumento) return c.nit || '';
+    var t = (catalogosMh ? catalogosMh.tiposDocumento : []).filter(function(x){ return x.codigo===c.tipoDocumento; })[0];
+    return (t ? t.nombre : c.tipoDocumento)+' '+(c.numDocumento||'');
+  }
+
   function renderClientes(){
     var tb = document.getElementById('cli-tbody');
     if(!tb) return;
     if(clientes.length===0){
-      tb.innerHTML = '<tr><td colspan="5"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
     } else {
       tb.innerHTML = clientes.map(function(c){
-        return '<tr><td class="prod-name">'+_h(c.nombre)+'</td>'+
+        return '<tr><td class="prod-name">'+_h(c.nombre)+(c.nombreComercial?'<div class="muted small">'+_h(c.nombreComercial)+'</div>':'')+'</td>'+
           '<td>'+(c.tipo==='CONTRIBUYENTE'?'Contribuyente':'Consumidor')+'</td>'+
-          '<td>'+_h(c.nit||'—')+'</td><td>'+_h(c.nrc||'—')+'</td><td>'+_h(c.correo||'—')+'</td></tr>';
+          '<td>'+_h(textoDocumento(c)||'—')+'</td><td>'+_h(c.nrc||'—')+'</td>'+
+          '<td>'+_h(textoUbicacion(c.direccion, true)||'—')+'</td><td>'+_h(c.correo||'—')+'</td></tr>';
       }).join('');
     }
     var n = document.getElementById('cli-count'); if(n) n.textContent = clientes.length + ' clientes';
@@ -239,29 +293,48 @@
   function toggleCamposContribuyente(){
     var esContrib = document.getElementById('cli-tipo').value==='CONTRIBUYENTE';
     document.getElementById('cli-contribuyente').style.display = esContrib ? '' : 'none';
+    document.getElementById('cli-consumidor-doc').style.display = esContrib ? 'none' : '';
+    document.getElementById('cli-dir-req').style.display = esContrib ? '' : 'none';
   }
 
   function crearCliente(){
     function v(id){ return document.getElementById(id).value.trim(); }
     var tipo = v('cli-tipo');
     var datos = {
-      tipo: tipo, nombre: v('cli-nombre'),
+      tipo: tipo, nombre: v('cli-nombre'), nombreComercial: v('cli-comercial') || null,
+      tipoDocumento: null, numDocumento: null,
       nit: null, nrc: null, codActividad: null, descActividad: null,
-      direccion: v('cli-direccion') || null, correo: v('cli-correo') || null
+      telefono: v('cli-telefono') || null, correo: v('cli-correo') || null, direccion: null
     };
     if(!datos.nombre){ toast('Ingresa el nombre del cliente','warn'); return; }
+
+    // Dirección: los tres códigos salen de los selects del catálogo MH
+    var dir = { departamento: v('cli-depto'), municipio: v('cli-municipio'), distrito: v('cli-distrito'), complemento: v('cli-complemento') };
+    var algo = dir.departamento || dir.municipio || dir.distrito || dir.complemento;
+    if(algo || tipo==='CONTRIBUYENTE'){
+      if(!dir.departamento || !dir.municipio || !dir.distrito || !dir.complemento){
+        toast('Completa la dirección: departamento, municipio, distrito y complemento','warn'); return;
+      }
+      datos.direccion = dir;
+    }
+
     if(tipo==='CONTRIBUYENTE'){
       datos.nit = v('cli-nit') || null; datos.nrc = v('cli-nrc') || null;
       datos.codActividad = v('cli-codact') || null; datos.descActividad = v('cli-descact') || null;
-      // el detalle de formato (dígitos, longitudes) lo valida la API
+      // el detalle de formato (dígitos, longitudes, catálogos) lo valida la API
       if(!datos.nit || !datos.nrc || !datos.codActividad || !datos.descActividad){
         toast('Un contribuyente requiere NIT, NRC y actividad económica','warn'); return;
       }
+    } else if(v('cli-tipodoc')){
+      datos.tipoDocumento = v('cli-tipodoc'); datos.numDocumento = v('cli-numdoc') || null;
+      if(!datos.numDocumento){ toast('Ingresa el número de documento','warn'); return; }
     }
     var btn = document.getElementById('cli-save'); btn.disabled = true;
     api.clientes.crear(datos).then(function(c){
       toast('Cliente "'+c.nombre+'" guardado');
-      ['cli-nombre','cli-nit','cli-nrc','cli-codact','cli-descact','cli-direccion','cli-correo'].forEach(function(id){ document.getElementById(id).value=''; });
+      ['cli-nombre','cli-comercial','cli-numdoc','cli-nit','cli-nrc','cli-codact','cli-descact','cli-telefono','cli-correo','cli-complemento']
+        .forEach(function(id){ document.getElementById(id).value=''; });
+      llenarSelectsCliente();
       buscarClientes(); cargarClientesVenta();
     }).catch(alertaError).then(function(){ btn.disabled = false; });
   }
@@ -394,11 +467,12 @@
     var c = clientePorId(ventaClienteId);
     if(c){
       html += '<div class="cli-resumen">'+
-        (c.nit?'<div><span>NIT</span>'+_h(c.nit)+'</div>':'')+
+        (textoDocumento(c)?'<div><span>Documento</span>'+_h(textoDocumento(c))+'</div>':'')+
         (c.nrc?'<div><span>NRC</span>'+_h(c.nrc)+'</div>':'')+
         (c.descActividad?'<div><span>Actividad</span>'+_h(c.codActividad+' · '+c.descActividad)+'</div>':'')+
+        (c.telefono?'<div><span>Teléfono</span>'+_h(c.telefono)+'</div>':'')+
         (c.correo?'<div><span>Correo</span>'+_h(c.correo)+'</div>':'')+
-        (c.direccion?'<div><span>Dirección</span>'+_h(c.direccion)+'</div>':'')+
+        (c.direccion?'<div><span>Dirección</span>'+_h([c.direccion.complemento, textoUbicacion(c.direccion)].filter(Boolean).join(', '))+'</div>':'')+
       '</div>';
     }
     html += '<p class="muted small" style="margin:-6px 0 14px">¿No está en la lista? <a href="#" class="link" onclick="setPanelById(\'vendedor\',\'v-clientes\');return false">Crear cliente</a></p>';
@@ -566,7 +640,7 @@
           '<td class="num"><div class="row-actions">'+
             '<button class="btn-mini" onclick="verDte('+d.id+')">Ver</button>'+
             accionesDte(d)+
-            '<button class="icon-btn" title="Enviar por correo" onclick="openEmailModal(\''+_h(d.numeroControl)+'\')">'+MAIL_SVG.replace('margin-right:5px','')+'</button>'+
+            '<button class="icon-btn" title="Enviar por correo" onclick="openEmailModal(\''+_h(d.numeroControl)+'\','+d.id+')">'+MAIL_SVG.replace('margin-right:5px','')+'</button>'+
           '</div></td></tr>';
       }).join('');
     }
@@ -1071,8 +1145,10 @@
       '</div>'+
     '</div>';
   }
-  function openEmailModal(dte){
+  var emailTargetId = null; // id del DTE para GET /api/dte/:id/pdf
+  function openEmailModal(dte, id){
     emailTargetDte = dte;
+    emailTargetId = id || null;
     document.getElementById('email-dte').textContent = dte;
     document.getElementById('email-input').value = '';
     document.getElementById('email-modal').classList.add('show');
@@ -1119,7 +1195,21 @@
       '.mono{font-family:monospace}';
     return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+fname+'</title><style>'+css+'</style></head><body>'+ buildDteHtml() +'</body></html>';
   }
+  /* PDF real del DTE (GET /api/dte/:id/pdf, misma plantilla del ejemplo).
+     En modo mock (o sin id) se descarga el PDF de ejemplo de js/pdf-data.js. */
   function downloadPdf(){
+    if(emailTargetId && !API_CONFIG.USE_MOCK){
+      api.dte.pdf(emailTargetId).then(function(blob){
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = (emailTargetDte||'DTE')+'.pdf';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+        toast('PDF descargado');
+      }, function(e){ toast((e && e.message) || 'No se pudo generar el PDF','warn'); });
+      return;
+    }
     try{
       var bin = atob(PDF_DATA);
       var bytes = new Uint8Array(bin.length);
