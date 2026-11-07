@@ -132,6 +132,8 @@ var api = (function () {
       actualizar: function (id, cambios) { return request('PUT', '/clientes/' + id, { body: cambios }); }
     },
     emisor: function () { return request('GET', '/emisor'); },
+    /** P2: { departamentos:[{codigo,nombre,municipios:[{codigo,nombre,distritos:[{codigo,nombre}]}]}], tiposDocumento } */
+    catalogos: function () { return request('GET', '/catalogos'); },
 
     dte: {
       /** tipo '01'|'03'|'05'; payload según docs/API.md; simular opcional */
@@ -144,7 +146,21 @@ var api = (function () {
       /** C3: consulta de DTE en MH (solo DTE en CONTINGENCIA) → { resultado: ENCONTRADO|NO_ENCONTRADO|SIN_RESPUESTA, estado, ... } */
       consultar: function (id, simular) { return request('POST', '/dte/' + id + '/consultar', { simular: simular }); },
       listar: function (filtros) { return request('GET', '/dte', { query: filtros }); },     // {tipo, estado, desde, hasta, clienteId}
-      obtener: function (id) { return request('GET', '/dte/' + id); }
+      obtener: function (id) { return request('GET', '/dte/' + id); },
+      /** GET /dte/:id/pdf → Promise<Blob> (binario, no JSON). Los errores llegan como ApiError. */
+      pdf: function (id) {
+        var headers = { 'Accept': 'application/pdf' };
+        var token = getToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        return fetch(API_CONFIG.BASE_URL + '/dte/' + id + '/pdf', { headers: headers }).then(function (res) {
+          if (res.ok) return res.blob();
+          return res.json().catch(function () { return null; }).then(function (json) {
+            return procesar(res.status, json || { ok: false, error: { codigo: 'ERROR_INTERNO', mensaje: 'No se pudo generar el PDF (HTTP ' + res.status + ')' } });
+          });
+        }, function (netErr) {
+          throw new ApiError('SIN_CONEXION', 'No se pudo conectar con la API: ' + netErr.message, 0);
+        });
+      }
     },
 
     contingencia: {

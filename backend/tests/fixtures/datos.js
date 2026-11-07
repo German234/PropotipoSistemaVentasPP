@@ -3,7 +3,7 @@ const emisor = {
   nit: '06140101001010', nrc: '100001', nombre: 'Batallón Atlacatl, S.A. de C.V.',
   codActividad: '47190', descActividad: 'Venta al por menor en comercios no especializados',
   nombreComercial: 'Tienda Atlacatl', tipoEstablecimiento: '02',
-  direccion: { departamento: '06', municipio: '14', complemento: 'Calle Principal #1, San Salvador' },
+  direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Calle Principal #1, San Salvador' },
   telefono: '22220000', correo: 'facturas@atlacatl.com.sv', codEstable: 'M001', codPuntoVenta: 'P001',
 };
 
@@ -18,12 +18,22 @@ const P007 = producto('P007', 18.5);
 const contribuyente = {
   id: 3, tipo: 'CONTRIBUYENTE', nombre: 'Distribuidora El Roble, S.A. de C.V.', nit: '06142301001234', nrc: '1234567',
   codActividad: '46900', descActividad: 'Venta al por mayor de otros productos',
-  direccion: 'Colonia Escalón, San Salvador', correo: 'compras@elroble.com.sv',
+  nombreComercial: 'El Roble', telefono: '22605000', tipoDocumento: '36', numDocumento: '06142301001234',
+  direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Colonia Escalón, Paseo General Escalón #3500' },
+  correo: 'compras@elroble.com.sv',
 };
 
 const consumidor = {
   id: 1, tipo: 'CONSUMIDOR', nombre: 'Juan Pérez', nit: null, nrc: null, codActividad: null, descActividad: null,
-  direccion: 'Antiguo Cuscatlán, La Libertad', correo: 'juan.perez@correo.com',
+  tipoDocumento: '13', numDocumento: '012345678', telefono: '77778888',
+  direccion: { departamento: '05', municipio: '26', distrito: '01', complemento: 'Residencial Las Colinas, casa 4' },
+  correo: 'juan.perez@correo.com',
+};
+
+/** Cliente anterior a P2: dirección solo texto, sin documento ni códigos MH. */
+const consumidorLegado = {
+  id: 2, tipo: 'CONSUMIDOR', nombre: 'María López', nit: null, nrc: null, codActividad: null, descActividad: null,
+  direccion: 'Santa Tecla, La Libertad', correo: 'maria.lopez@correo.com',
 };
 
 const base = (tipo, n = 1) => ({
@@ -34,4 +44,4 @@ const base = (tipo, n = 1) => ({
   emisor,
 });
 
-module.exports = { emisor, producto, P001, P002, P007, contribuyente, consumidor, base };
+module.exports = { emisor, producto, P001, P002, P007, contribuyente, consumidor, consumidorLegado, base };

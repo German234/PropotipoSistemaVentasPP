@@ -45,6 +45,14 @@ describe('03 CCF · emisión exitosa', () => {
     });
   });
 
+  test('P2: nombre comercial, teléfono y dirección con los códigos MH del cliente', () => {
+    expect(d.jsonDte.receptor).toMatchObject({
+      nombreComercial: 'El Roble', telefono: '22605000',
+      direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Colonia Escalón, Paseo General Escalón #3500' },
+    });
+    expect(d.jsonDte.emisor.direccion).toMatchObject({ departamento: '06', municipio: '23', distrito: '14' });
+  });
+
   test('items con acreditada 0 y pendiente = cantidad (para la NC)', () => {
     expect(d.items[0]).toMatchObject({ cantidad: 40, acreditada: 0, pendiente: 40, ivaItem: 13 });
     expect(d.notasCredito).toEqual([]);

@@ -181,6 +181,21 @@ IF COL_LENGTH('dbo.dte', 'consultas_mh') IS NULL
                             resultado_consulta_mh VARCHAR(15) NULL;   -- ENCONTRADO | NO_ENCONTRADO | SIN_RESPUESTA
 GO
 
+/* P2: datos completos del receptor con los catálogos MH (backend/src/dte/catalogosMh.js).
+   clientes.direccion pasa a ser el complemento; departamento/municipio/distrito son códigos MH. */
+IF COL_LENGTH('dbo.clientes', 'direccion_departamento') IS NULL
+    ALTER TABLE dbo.clientes ADD tipo_documento         VARCHAR(2)    NULL,   -- CAT-022 (36 NIT, 13 DUI, ...)
+                                 num_documento          VARCHAR(20)   NULL,
+                                 nombre_comercial       NVARCHAR(150) NULL,
+                                 telefono               VARCHAR(30)   NULL,
+                                 direccion_departamento VARCHAR(2)    NULL,   -- CAT-012
+                                 direccion_municipio    VARCHAR(2)    NULL,   -- CAT-013
+                                 direccion_distrito     VARCHAR(2)    NULL;
+GO
+IF COL_LENGTH('dbo.emisor', 'direccion_distrito') IS NULL
+    ALTER TABLE dbo.emisor ADD direccion_distrito VARCHAR(2) NULL;
+GO
+
 /* ---------- mh_simulado_dte (C3): lo que el MH simulado "recibió" aunque su respuesta no llegara (X-Simular: timeout).
    Es el lado de Hacienda: la consulta de DTE y los reenvíos lo leen. No es parte del POS real. ---------- */
 IF OBJECT_ID('dbo.mh_simulado_dte', 'U') IS NULL

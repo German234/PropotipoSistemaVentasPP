@@ -30,11 +30,20 @@ const emisor = (e) => ({
 });
 
 /**
- * La tabla clientes guarda la dirección como texto libre; el MH pide departamento/municipio/distrito.
- * Simulación: se usan los códigos del emisor y el texto del cliente como complemento.
+ * Dirección MH del receptor. El cliente guarda departamento/municipio/distrito con códigos del catálogo MH
+ * (dte/catalogosMh.js, validados en clientesService). Clientes anteriores a P2 (solo texto, sin códigos):
+ * se usan los códigos del emisor y su texto como complemento.
  */
-const direccionCliente = (cliente, e) =>
-  direccion({ ...e.direccion, distrito: null, complemento: cliente.direccion || 'Sin dirección' });
+const direccionCliente = (cliente, e) => {
+  const d = cliente.direccion;
+  if (d && typeof d === 'object' && d.departamento) return direccion(d);
+  const texto = (d && typeof d === 'object' ? d.complemento : d) || 'Sin dirección';
+  return direccion({ ...e.direccion, complemento: texto });
+};
+
+/** Número de documento como lo pide MH: DUI (13) con guion ########-#; el resto tal cual. */
+const numDocumento = (tipo, num) =>
+  tipo === '13' && /^[0-9]{9}$/.test(num || '') ? `${num.slice(0, 8)}-${num.slice(8)}` : num || null;
 
 /** identificacion común (modelo previo, transmisión normal; contingencia = null). */
 const identificacion = ({ version, tipoDte, numeroControl, codigoGeneracion, fecEmi, horEmi }) => ({
@@ -87,5 +96,5 @@ const enContingencia = (json, tipoContingencia = TIPO_CONTINGENCIA_MH) => ({
 });
 
 module.exports = {
-  AMBIENTE, TIPO_CONTINGENCIA_MH, direccion, emisor, direccionCliente, identificacion, item, pagos, enContingencia,
+  AMBIENTE, TIPO_CONTINGENCIA_MH, direccion, emisor, direccionCliente, numDocumento, identificacion, item, pagos, enContingencia,
 };

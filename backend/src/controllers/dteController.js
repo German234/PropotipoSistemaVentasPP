@@ -3,6 +3,7 @@ const consultas = require('../services/dteConsultasService');
 const consultaMh = require('../services/consultaMhService');
 const { leerModo } = require('../dte/simuladores/mhRecepcion');
 const { ok } = require('../utils/respuesta');
+const pdfDte = require('../dte/pdf');
 const v = require('../utils/validar');
 
 /** El modo de MH (ok | rechazo | contingencia) sale del header X-Simular. */
@@ -32,8 +33,20 @@ const listar = async (req, res) => {
 /** GET /api/dte/:id */
 const obtener = async (req, res) => ok(res, await consultas.obtener(v.id(req.params.id)));
 
+/** GET /api/dte/:id/pdf — representación gráfica (application/pdf, no JSON) */
+const pdf = async (req, res) => {
+  const dte = await consultas.obtener(v.id(req.params.id));
+  const buf = await pdfDte.generar(dte);
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${dte.numeroControl}.pdf"`,
+    'Content-Length': buf.length,
+  });
+  res.send(buf);
+};
+
 /** POST /api/dte/:id/consultar — consulta de DTE en MH (cola de consultas, C3) */
 const consultar = async (req, res) =>
   ok(res, await consultaMh.consultar(v.id(req.params.id), req.usuario, leerModo(req)));
 
-module.exports = { emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, consultar, invalidar, listar, obtener };
+module.exports = { emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, consultar, invalidar, listar, obtener, pdf };

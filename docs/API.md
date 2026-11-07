@@ -111,26 +111,29 @@ Parcial: solo los campos a modificar (p. ej. `{ "precio": 2.75 }` o `{ "activo":
 
 ## Clientes
 
-Campos: `id`, `tipo` (`CONSUMIDOR` | `CONTRIBUYENTE`), `nombre`, `nit`, `nrc`, `codActividad`, `descActividad`, `direccion`, `correo`, `activo`.
+Campos: `id`, `tipo` (`CONSUMIDOR` | `CONTRIBUYENTE`), `nombre`, `nombreComercial`, `tipoDocumento`, `numDocumento`, `nit`, `nrc`, `codActividad`, `descActividad`, `direccion`, `telefono`, `correo`, `activo`.
 
-- `CONTRIBUYENTE`: `nit` (9 o 14 dígitos), `nrc` (1–8 dígitos), `codActividad` (2–6 dígitos) y `descActividad` obligatorios.
-- `CONSUMIDOR`: todo opcional salvo `nombre`.
-- `nit` y `nrc` aceptan guiones/espacios y se guardan solo con dígitos.
+- `direccion`: `{ departamento, municipio, distrito, complemento }` con **códigos MH** (ver `GET /api/catalogos`) o `null`. Los tres códigos deben existir y estar anidados (el municipio pertenece al departamento y el distrito al municipio); `complemento` 1–200 caracteres. Se copia tal cual al receptor del DTE. Un cliente anterior a P2 puede devolver `{ departamento: null, municipio: null, distrito: null, complemento: "texto" }` (el DTE usa entonces los códigos del emisor).
+- `CONTRIBUYENTE`: `nit` (9 o 14 dígitos), `nrc` (1–8 dígitos), `codActividad` (5–6 dígitos, CAT-019), `descActividad` y `direccion` completa obligatorios. Su documento es siempre NIT: `tipoDocumento` = `"36"`, `numDocumento` = `nit`.
+- `CONSUMIDOR`: todo opcional salvo `nombre`. Documento con `tipoDocumento` (CAT-022: `36` NIT, `13` DUI, `03` pasaporte, `02` carnet de residente, `37` otro) + `numDocumento` (NIT 9/14 dígitos, DUI 9 dígitos; el resto texto ≤ 20). Compatibilidad: mandar solo `nit` equivale a `tipoDocumento "36"`. `nit` se devuelve solo si el documento es NIT.
+- `telefono`: opcional, ≥ 8 dígitos (admite espacios, `+`, `-`, paréntesis). `nombreComercial` ≤ 150.
+- `nit`, `nrc` y los números de NIT/DUI aceptan guiones/espacios y se guardan solo con dígitos (en el JSON del DTE el DUI va como `########-#`).
 - Rutas: cualquier usuario autenticado (`GET`, `GET /:id`, `POST`, `PUT /:id`).
 
 ### GET /api/clientes?q=&tipo=&incluirInactivos=1
 
-`q` busca en nombre, NIT o NRC; `tipo` filtra. Por defecto solo activos.
+`q` busca en nombre, nombre comercial, documento, NIT o NRC; `tipo` filtra. Por defecto solo activos.
 
 ```json
 {
   "ok": true,
   "data": [
     {
-      "id": 1, "tipo": "CONTRIBUYENTE", "nombre": "Distribuidora El Roble, S.A. de C.V.",
-      "nit": "06142301001234", "nrc": "1234567", "codActividad": "46900",
-      "descActividad": "Venta al por mayor de otros productos",
-      "direccion": "San Salvador, Colonia Escalón", "correo": "compras@elroble.com.sv"
+      "id": 3, "tipo": "CONTRIBUYENTE", "nombre": "Distribuidora El Roble, S.A. de C.V.", "nombreComercial": "El Roble",
+      "tipoDocumento": "36", "numDocumento": "06142301001234", "nit": "06142301001234", "nrc": "1234567",
+      "codActividad": "46900", "descActividad": "Venta al por mayor de otros productos",
+      "direccion": { "departamento": "06", "municipio": "23", "distrito": "14", "complemento": "Colonia Escalón, Paseo General Escalón #3500" },
+      "telefono": "22605000", "correo": "compras@elroble.com.sv", "activo": true
     }
   ]
 }
@@ -140,16 +143,41 @@ Campos: `id`, `tipo` (`CONSUMIDOR` | `CONTRIBUYENTE`), `nombre`, `nit`, `nrc`, `
 
 ```json
 {
-  "tipo": "CONSUMIDOR", "nombre": "Juan Pérez", "nit": null, "nrc": null,
-  "codActividad": null, "descActividad": null, "direccion": "Antiguo Cuscatlán", "correo": "juan@correo.com"
+  "tipo": "CONSUMIDOR", "nombre": "Juan Pérez", "tipoDocumento": "13", "numDocumento": "01234567-8",
+  "telefono": "7777-8888", "correo": "juan@correo.com",
+  "direccion": { "departamento": "05", "municipio": "26", "distrito": "01", "complemento": "Residencial Las Colinas, casa 4" }
 }
 ```
 
-→ `{ "ok": true, "data": { "id": 2, ... } }`
+→ `{ "ok": true, "data": { "id": 5, ... } }` · código inválido → 400 `VALIDACION` (p. ej. `direccion.municipio "23" no pertenece al departamento Santa Ana (CAT-013)`).
 
 ### PUT /api/clientes/:id
 
-Parcial, igual que productos. Se revalida el registro completo (p. ej. quitar el `nrc` a un CONTRIBUYENTE → 400). Devuelve el cliente completo.
+Parcial, igual que productos. Se revalida el registro completo (p. ej. quitar el `nrc` a un CONTRIBUYENTE → 400). `direccion` se reemplaza completa (objeto) o se borra con `null`. Devuelve el cliente completo.
+
+---
+
+## Catálogos
+
+### GET /api/catalogos (P2)
+
+Catálogos MH para el formulario de clientes (cualquier rol). Fuente única: `backend/src/dte/catalogosMh.js` (también servido como `/js/catalogos-mh.js` para los mocks).
+
+- `departamentos` (CAT-012, 14) → `municipios` (CAT-013, los 44 de la reforma 2024) → `distritos` (262; código = el del antiguo municipio dentro del departamento).
+- `tiposDocumento` (CAT-022 que admite el POS).
+
+```json
+{
+  "ok": true,
+  "data": {
+    "departamentos": [
+      { "codigo": "06", "nombre": "San Salvador", "municipios": [
+        { "codigo": "23", "nombre": "San Salvador Centro", "distritos": [ { "codigo": "14", "nombre": "San Salvador" }, "..." ] }, "..." ] }, "..."
+    ],
+    "tiposDocumento": [ { "codigo": "36", "nombre": "NIT" }, { "codigo": "13", "nombre": "DUI" }, "..." ]
+  }
+}
+```
 
 ---
 
@@ -400,6 +428,10 @@ Respuesta de emisión (`firmador` y `respuestaMh` parseados) más:
   }
 }
 ```
+
+### GET /api/dte/:id/pdf → 200 `application/pdf`
+
+Representación gráfica del DTE (cualquier rol, cualquier estado). **No responde JSON**: el cuerpo es el PDF, con `Content-Disposition: attachment; filename="<numeroControl>.pdf"`. Se arma con el `jsonDte` guardado: encabezado y título por tipo (FACTURA / COMPROBANTE DE CRÉDITO FISCAL / NOTA DE CRÉDITO), código de generación, número de control, sello (o `Sin sello (<estado>)`), QR a la consulta pública de MH, modelo/tipo de transmisión, EMISOR/RECEPTOR (`CONSUMIDOR FINAL` si no hay receptor), ítems, totales (01: IVA incluido; 03/05: IVA 13 %), valor en letras, condición y observaciones (documento relacionado en la NC). Si el DTE no está `PROCESADO` lleva un sello de agua con el estado. Errores con el formato JSON estándar (401, 404 `NO_ENCONTRADO`).
 
 ---
 

@@ -8,7 +8,7 @@ const factura01 = require('../../src/dte/builders/factura01');
 const ccf03 = require('../../src/dte/builders/ccf03');
 const notaCredito05 = require('../../src/dte/builders/notaCredito05');
 const invalidacion = require('../../src/dte/builders/invalidacion');
-const { emisor, P001, P002, P007, contribuyente, consumidor, base } = require('../fixtures/datos');
+const { emisor, P001, P002, P007, contribuyente, consumidor, consumidorLegado, base } = require('../fixtures/datos');
 
 const NODOS = ['identificacion', 'documentoRelacionado', 'emisor', 'receptor', 'otrosDocumentos', 'ventaTercero', 'cuerpoDocumento', 'resumen', 'apendice'];
 
@@ -41,12 +41,19 @@ describe('01 Factura · builder', () => {
     expect(j.resumen.pagos).toEqual([{ codigo: '01', montoPago: 9.16, referencia: null, plazo: null, periodo: null }]);
   });
 
-  test('con receptor consumidor (sin NIT) y a crédito: cumple el esquema y pagos = null', () => {
+  test('con receptor consumidor con DUI y a crédito: cumple el esquema y pagos = null', () => {
     const j = factura({ cliente: consumidor, condicionOperacion: 2 });
     expect(j).toCumplirEsquemaMh('01');
-    expect(j.receptor).toMatchObject({ tipoDocumento: null, numDocumento: null, nombre: 'Juan Pérez' });
-    expect(j.receptor.direccion).toMatchObject({ departamento: '06', municipio: '14', distrito: '01' });
+    expect(j.receptor).toMatchObject({ tipoDocumento: '13', numDocumento: '01234567-8', nombre: 'Juan Pérez', telefono: '77778888' });
+    expect(j.receptor.direccion).toEqual(consumidor.direccion);
     expect(j.resumen.pagos).toBeNull();
+  });
+
+  test('cliente anterior a P2 (dirección solo texto): códigos del emisor + texto como complemento', () => {
+    const j = factura({ cliente: consumidorLegado });
+    expect(j).toCumplirEsquemaMh('01');
+    expect(j.receptor).toMatchObject({ tipoDocumento: null, numDocumento: null });
+    expect(j.receptor.direccion).toEqual({ departamento: '06', municipio: '23', distrito: '14', complemento: 'Santa Tecla, La Libertad' });
   });
 
   test('control negativo: el validador rechaza un nodo `extension` o un numeroControl mal formado', () => {
@@ -69,7 +76,8 @@ describe('03 CCF · builder', () => {
     expect(j).toCumplirEsquemaMh('03');
     expect(Object.keys(j)).toEqual(NODOS);
     expect(j.identificacion).toMatchObject({ version: 4, tipoDte: '03' });
-    expect(j.receptor).toMatchObject({ nit: contribuyente.nit, nrc: contribuyente.nrc, codActividad: '46900' });
+    expect(j.receptor).toMatchObject({ nit: contribuyente.nit, nrc: contribuyente.nrc, codActividad: '46900', nombreComercial: 'El Roble', telefono: '22605000' });
+    expect(j.receptor.direccion).toEqual(contribuyente.direccion);
     expect(j.cuerpoDocumento.every((it) => JSON.stringify(it.tributos) === '["20"]')).toBe(true);
     expect(j.resumen.tributos[0]).toMatchObject({ codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%' });
   });

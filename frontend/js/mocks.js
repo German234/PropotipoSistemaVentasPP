@@ -68,7 +68,7 @@ var MockApi = (function () {
       nit: '06140101001010', nrc: '100001', nombre: 'Batallón Atlacatl, S.A. de C.V.',
       codActividad: '47190', descActividad: 'Venta al por menor en comercios no especializados',
       nombreComercial: 'Tienda Atlacatl', tipoEstablecimiento: '02',
-      direccion: { departamento: '06', municipio: '14', complemento: 'Calle Principal #1, San Salvador' },
+      direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Calle Principal #1, San Salvador' },
       telefono: '22220000', correo: 'facturas@atlacatl.com.sv', codEstable: 'M001', codPuntoVenta: 'P001'
     },
     productos: [
@@ -79,16 +79,24 @@ var MockApi = (function () {
       ['P009', 'Corrector líquido', 1.25, 120], ['P010', 'Engrapadora metálica', 6.90, 40]
     ].map(function (p, i) { return { id: i + 1, codigo: p[0], descripcion: p[1], precio: p[2], stock: p[3], unidad: 59, activo: true }; }),
     clientes: [
-      { id: 1, tipo: 'CONSUMIDOR', nombre: 'Juan Pérez', nit: null, nrc: null, codActividad: null, descActividad: null,
-        direccion: 'Antiguo Cuscatlán, La Libertad', correo: 'juan.perez@correo.com', activo: true },
-      { id: 2, tipo: 'CONSUMIDOR', nombre: 'María López', nit: null, nrc: null, codActividad: null, descActividad: null,
-        direccion: 'Santa Tecla, La Libertad', correo: 'maria.lopez@correo.com', activo: true },
-      { id: 3, tipo: 'CONTRIBUYENTE', nombre: 'Distribuidora El Roble, S.A. de C.V.', nit: '06142301001234', nrc: '1234567',
-        codActividad: '46900', descActividad: 'Venta al por mayor de otros productos',
-        direccion: 'Colonia Escalón, San Salvador', correo: 'compras@elroble.com.sv', activo: true },
-      { id: 4, tipo: 'CONTRIBUYENTE', nombre: 'Librería Cuscatlán, S.A. de C.V.', nit: '06140512991021', nrc: '2345678',
-        codActividad: '47610', descActividad: 'Venta al por menor de libros, periódicos y artículos de papelería',
-        direccion: 'Centro de Gobierno, San Salvador', correo: 'admin@libreriacuscatlan.com.sv', activo: true }
+      { id: 1, tipo: 'CONSUMIDOR', nombre: 'Juan Pérez', nombreComercial: null, tipoDocumento: '13', numDocumento: '012345678',
+        nit: null, nrc: null, codActividad: null, descActividad: null, telefono: '77778888',
+        direccion: { departamento: '05', municipio: '26', distrito: '01', complemento: 'Residencial Las Colinas, casa 4' },
+        correo: 'juan.perez@correo.com', activo: true },
+      { id: 2, tipo: 'CONSUMIDOR', nombre: 'María López', nombreComercial: null, tipoDocumento: null, numDocumento: null,
+        nit: null, nrc: null, codActividad: null, descActividad: null, telefono: null,
+        direccion: { departamento: '05', municipio: '28', distrito: '10', complemento: 'Calle Chiltiupán, Ciudad Merliot' },
+        correo: 'maria.lopez@correo.com', activo: true },
+      { id: 3, tipo: 'CONTRIBUYENTE', nombre: 'Distribuidora El Roble, S.A. de C.V.', nombreComercial: 'El Roble',
+        tipoDocumento: '36', numDocumento: '06142301001234', nit: '06142301001234', nrc: '1234567',
+        codActividad: '46900', descActividad: 'Venta al por mayor de otros productos', telefono: '22605000',
+        direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Colonia Escalón, Paseo General Escalón #3500' },
+        correo: 'compras@elroble.com.sv', activo: true },
+      { id: 4, tipo: 'CONTRIBUYENTE', nombre: 'Librería Cuscatlán, S.A. de C.V.', nombreComercial: 'Librería Cuscatlán',
+        tipoDocumento: '36', numDocumento: '06140512991021', nit: '06140512991021', nrc: '2345678',
+        codActividad: '47610', descActividad: 'Venta al por menor de libros, periódicos y artículos de papelería', telefono: '22214400',
+        direccion: { departamento: '06', municipio: '23', distrito: '14', complemento: 'Centro de Gobierno, Edificio B, local 2' },
+        correo: 'admin@libreriacuscatlan.com.sv', activo: true }
     ],
     correlativos: { '01': 0, '03': 0, '05': 0 },
     dte: [],          // registro interno (ver guardarDte)
@@ -168,17 +176,43 @@ var MockApi = (function () {
     if (db.productos.some(function (x) { return x.codigo === p.codigo && x.id !== idActual; })) err('VALIDACION', 'Ya existe un producto con el código ' + p.codigo);
     return p;
   }
+  /** P2: dirección con códigos del catálogo MH (CATALOGOS_MH, el mismo archivo que usa el backend). */
+  function validarDireccion(d) {
+    if (d == null) return null;
+    if (typeof d !== 'object') err('VALIDACION', 'direccion debe ser un objeto { departamento, municipio, distrito, complemento }');
+    var b = CATALOGOS_MH.buscar(d.departamento, d.municipio, d.distrito);
+    if (!b.departamento) err('VALIDACION', 'direccion.departamento "' + d.departamento + '" no existe en el catálogo MH (CAT-012)');
+    if (!b.municipio) err('VALIDACION', 'direccion.municipio "' + d.municipio + '" no pertenece al departamento ' + b.departamento.nombre + ' (CAT-013)');
+    if (!b.distrito) err('VALIDACION', 'direccion.distrito "' + d.distrito + '" no pertenece al municipio ' + b.municipio.nombre);
+    return { departamento: d.departamento, municipio: d.municipio, distrito: d.distrito, complemento: texto(d.complemento, 'direccion.complemento', 200) };
+  }
   function validarCliente(c) {
     if (['CONSUMIDOR', 'CONTRIBUYENTE'].indexOf(c.tipo) === -1) err('VALIDACION', 'tipo debe ser CONSUMIDOR o CONTRIBUYENTE');
     c.nombre = texto(c.nombre, 'nombre', 250);
+    c.nombreComercial = textoOpc(c.nombreComercial); c.telefono = textoOpc(c.telefono);
     c.nit = digitos(c.nit); c.nrc = digitos(c.nrc); c.codActividad = digitos(c.codActividad);
-    c.descActividad = textoOpc(c.descActividad); c.direccion = textoOpc(c.direccion); c.correo = textoOpc(c.correo);
+    c.descActividad = textoOpc(c.descActividad); c.correo = textoOpc(c.correo);
+    c.direccion = validarDireccion(c.direccion);
     c.activo = c.activo !== false;
     if (c.tipo === 'CONTRIBUYENTE') {
       if (!c.nit || !/^(\d{9}|\d{14})$/.test(c.nit)) err('VALIDACION', 'El NIT debe tener 9 o 14 dígitos');
       if (!c.nrc || !/^\d{1,8}$/.test(c.nrc)) err('VALIDACION', 'El NRC debe tener de 1 a 8 dígitos');
-      if (!c.codActividad || !/^\d{2,6}$/.test(c.codActividad)) err('VALIDACION', 'codActividad debe tener de 2 a 6 dígitos');
+      if (!c.codActividad || !/^\d{5,6}$/.test(c.codActividad)) err('VALIDACION', 'codActividad debe tener 5 o 6 dígitos (CAT-019)');
       if (!c.descActividad) err('VALIDACION', 'El campo descActividad es obligatorio');
+      if (!c.direccion) err('VALIDACION', 'direccion (departamento, municipio, distrito y complemento) es obligatoria para CONTRIBUYENTE');
+      c.tipoDocumento = '36'; c.numDocumento = c.nit;
+    } else {
+      if (!c.tipoDocumento && c.nit) c.tipoDocumento = '36';
+      if (c.tipoDocumento) {
+        if (!CATALOGOS_MH.tiposDocumento.some(function (t) { return t.codigo === c.tipoDocumento; })) err('VALIDACION', 'tipoDocumento no está en el CAT-022');
+        var num = c.numDocumento || c.nit;
+        if (!num) err('VALIDACION', 'numDocumento es obligatorio si se indica tipoDocumento');
+        c.numDocumento = (c.tipoDocumento === '36' || c.tipoDocumento === '13') ? digitos(num) : String(num).trim();
+        if (c.tipoDocumento === '13' && !/^\d{9}$/.test(c.numDocumento)) err('VALIDACION', 'numDocumento (DUI) debe tener 9 dígitos');
+        if (c.tipoDocumento === '36' && !/^(\d{9}|\d{14})$/.test(c.numDocumento)) err('VALIDACION', 'numDocumento (NIT) debe tener 9 o 14 dígitos');
+      } else c.numDocumento = null;
+      c.tipoDocumento = c.tipoDocumento || null;
+      c.nit = c.tipoDocumento === '36' ? c.numDocumento : null;
     }
     return c;
   }
@@ -189,14 +223,19 @@ var MockApi = (function () {
     var n = ++db.correlativos[tipo];
     return 'DTE-' + tipo + '-' + db.emisor.codEstable + db.emisor.codPuntoVenta + '-' + ('000000000000000' + n).slice(-15);
   }
-  function direccionMh(dir) { return { departamento: dir.departamento, municipio: dir.municipio, distrito: '01', complemento: dir.complemento }; }
+  function direccionMh(dir) { return { departamento: dir.departamento, municipio: dir.municipio, distrito: dir.distrito || '01', complemento: dir.complemento }; }
   function emisorDte(conEstable) {
     var e = db.emisor, o = { nit: e.nit, nrc: e.nrc, nombre: e.nombre, codActividad: e.codActividad, descActividad: e.descActividad,
       nombreComercial: e.nombreComercial, direccion: direccionMh(e.direccion), telefono: e.telefono, correo: e.correo };
     if (conEstable) { o.codEstable = e.codEstable; o.codPuntoVenta = e.codPuntoVenta; }
     return o;
   }
-  function dirCliente(c) { return direccionMh({ departamento: db.emisor.direccion.departamento, municipio: db.emisor.direccion.municipio, complemento: c.direccion || 'Sin dirección' }); }
+  function dirCliente(c) {
+    if (c.direccion && c.direccion.departamento) return direccionMh(c.direccion);
+    var e = db.emisor.direccion;
+    return direccionMh({ departamento: e.departamento, municipio: e.municipio, distrito: e.distrito, complemento: (c.direccion && c.direccion.complemento) || 'Sin dirección' });
+  }
+  function numDocMh(tipo, num) { return tipo === '13' && /^\d{9}$/.test(num || '') ? num.slice(0, 8) + '-' + num.slice(8) : num || null; }
   function firmar(json) {
     var bytes = ''; for (var i = 0; i < 64; i++) bytes += String.fromCharCode(Math.floor(Math.random() * 256));
     var firma = btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -274,11 +313,14 @@ var MockApi = (function () {
     var ahora = new Date(), codGen = uuid(), numCtrl = siguienteNumeroControl(tipo);
     var receptor = null;
     if (tipo === '01' && cliente) {
-      receptor = { tipoDocumento: cliente.nit ? '36' : null, numDocumento: cliente.nit || null, nrc: null, nombre: cliente.nombre,
-        codActividad: null, descActividad: null, direccion: dirCliente(cliente), telefono: null, correo: cliente.correo };
+      var td = cliente.tipoDocumento || (cliente.nit ? '36' : null);
+      receptor = { tipoDocumento: td, numDocumento: td ? numDocMh(td, cliente.numDocumento || cliente.nit) : null, nrc: cliente.nrc || null, nombre: cliente.nombre,
+        codActividad: cliente.codActividad || null, descActividad: cliente.descActividad || null,
+        direccion: cliente.direccion ? dirCliente(cliente) : null, telefono: cliente.telefono || null, correo: cliente.correo };
     } else if (tipo === '03') {
       receptor = { nit: cliente.nit, nrc: cliente.nrc, nombre: cliente.nombre, codActividad: cliente.codActividad,
-        descActividad: cliente.descActividad, nombreComercial: null, direccion: dirCliente(cliente), telefono: null, correo: cliente.correo };
+        descActividad: cliente.descActividad, nombreComercial: cliente.nombreComercial || null, direccion: dirCliente(cliente),
+        telefono: cliente.telefono || null, correo: cliente.correo };
     }
     var cuerpo = items.map(function (it) {
       var o = { numItem: it.numItem, tipoItem: 1, numeroDocumento: null, cantidad: it.cantidad, codigo: it.codigo, codTributo: null,
@@ -731,7 +773,8 @@ var MockApi = (function () {
       var t = (query.q || '').toLowerCase();
       return db.clientes.filter(function (c) {
         return (query.incluirInactivos == 1 || c.activo) && (!query.tipo || c.tipo === query.tipo) &&
-          (!t || c.nombre.toLowerCase().indexOf(t) !== -1 || (c.nit || '').indexOf(t) !== -1 || (c.nrc || '').indexOf(t) !== -1);
+          (!t || c.nombre.toLowerCase().indexOf(t) !== -1 || (c.nombreComercial || '').toLowerCase().indexOf(t) !== -1 ||
+            (c.nit || '').indexOf(t) !== -1 || (c.nrc || '').indexOf(t) !== -1 || (c.numDocumento || '').indexOf(t) !== -1);
       }).map(clienteOut);
     }
     if (path === '/clientes' && method === 'POST') {
@@ -749,6 +792,7 @@ var MockApi = (function () {
       }
     }
     if (path === '/emisor' && method === 'GET') return clone(db.emisor);
+    if (path === '/catalogos' && method === 'GET') return { departamentos: clone(CATALOGOS_MH.departamentos), tiposDocumento: clone(CATALOGOS_MH.tiposDocumento) };
 
     if (method === 'POST' && (m = /^\/dte\/(01|03|05)$/.exec(path))) {
       var modo = modoSimular(headers);
