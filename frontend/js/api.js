@@ -29,22 +29,37 @@ var api = (function () {
 
   function ls(fn) { try { return fn(); } catch (e) { return null; } }
 
-  /* ---------- sesión ---------- */
-  function getToken() { return ls(function () { return localStorage.getItem(API_CONFIG.TOKEN_KEY); }); }
-  function getUsuario() {
-    var s = ls(function () { return localStorage.getItem(API_CONFIG.USER_KEY); });
-    try { return s ? JSON.parse(s) : null; } catch (e) { return null; }
-  }
+  /* ---------- sesión ----------
+   * API real (Fase 3): el JWT vive en la cookie HttpOnly `pos_token` que pone el backend; el JavaScript de la página
+   * no puede leerlo, así que un XSS ya no puede robar el token. Nada sensible se guarda en localStorage.
+   * Las peticiones que modifican datos llevan X-CSRF-Token (= cookie legible `pos_csrf`).
+   * Modo mock: no hay servidor ni cookies; el token falso de mocks.js se guarda en sessionStorage.
+   */
+  var usuarioSesion = null;
+  ls(function () { localStorage.removeItem(API_CONFIG.TOKEN_KEY); localStorage.removeItem(API_CONFIG.USER_KEY); }); // restos de versiones anteriores
+  function getToken() { return API_CONFIG.USE_MOCK ? ls(function () { return sessionStorage.getItem(API_CONFIG.TOKEN_KEY); }) : null; }
+  function getUsuario() { return usuarioSesion; }
   function setSession(token, usuario) {
-    ls(function () {
-      localStorage.setItem(API_CONFIG.TOKEN_KEY, token);
-      localStorage.setItem(API_CONFIG.USER_KEY, JSON.stringify(usuario));
-    });
+    usuarioSesion = usuario;
+    if (API_CONFIG.USE_MOCK) ls(function () { sessionStorage.setItem(API_CONFIG.TOKEN_KEY, token); });
   }
   function clearSession() {
-    ls(function () { localStorage.removeItem(API_CONFIG.TOKEN_KEY); localStorage.removeItem(API_CONFIG.USER_KEY); });
+    usuarioSesion = null;
+    ls(function () { sessionStorage.removeItem(API_CONFIG.TOKEN_KEY); });
   }
-  function isLoggedIn() { return !!getToken(); }
+  function isLoggedIn() { return !!usuarioSesion; }
+  function csrfToken() {
+    var m = /(?:^|;\s*)pos_csrf=([^;]+)/.exec(typeof document !== 'undefined' ? document.cookie : '');
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function cabecerasSesion(method, headers) {
+    var token = getToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (!API_CONFIG.USE_MOCK && ['GET', 'HEAD', 'OPTIONS'].indexOf(method) === -1) {
+      var c = csrfToken(); if (c) headers['X-CSRF-Token'] = c;
+    }
+    return headers;
+  }
 
   /* ---------- núcleo ---------- */
   function queryString(q) {
@@ -77,8 +92,7 @@ var api = (function () {
     method = method.toUpperCase();
     var headers = { 'Accept': 'application/json' };
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-    var token = getToken();
-    if (opts.auth !== false && token) headers['Authorization'] = 'Bearer ' + token;
+    if (opts.auth !== false) cabecerasSesion(method, headers);
     if (opts.simular) headers['X-Simular'] = opts.simular;
 
     if (API_CONFIG.USE_MOCK) {
@@ -92,6 +106,7 @@ var api = (function () {
     return fetch(API_CONFIG.BASE_URL + path + queryString(opts.query), {
       method: method,
       headers: headers,
+      credentials: 'same-origin',
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
     }).then(function (res) {
       return res.text().then(function (txt) {
@@ -110,14 +125,26 @@ var api = (function () {
     request: request,
     getToken: getToken, getUsuario: getUsuario, setSession: setSession, clearSession: clearSession, isLoggedIn: isLoggedIn,
 
+    /** { api, db, ambiente, fecha, demo: { credenciales:[{usuario,password,rol}] } | null } */
     health: function () { return request('GET', '/health', { auth: false }); },
 
-    /** Guarda token y usuario; resuelve con { token, usuario } */
+    /** El backend deja la sesión en cookies; aquí solo se recuerda el usuario en memoria. Resuelve con { token, usuario } */
     login: function (usuario, password) {
       return request('POST', '/auth/login', { body: { usuario: usuario, password: password }, auth: false })
         .then(function (d) { setSession(d.token, d.usuario); return d; });
     },
-    logout: function () { clearSession(); },
+    /** Restaura la sesión al recargar (GET /auth/sesion con la cookie). Resuelve con el usuario o rechaza (401). */
+    sesion: function () {
+      // sin cookie pos_csrf (misma vida que la sesión) no hay sesión: no se consulta y se evita un 401 en consola
+      if (API_CONFIG.USE_MOCK ? !getToken() : !csrfToken()) return Promise.reject(new ApiError('NO_AUTENTICADO', 'Sin sesión', 401));
+      return request('GET', '/auth/sesion').then(function (d) { usuarioSesion = d.usuario; return d.usuario; });
+    },
+    /** POST /auth/logout borra las cookies en el servidor; la sesión local se limpia aunque falle la red. */
+    logout: function () {
+      var p = API_CONFIG.USE_MOCK ? Promise.resolve() : request('POST', '/auth/logout', { auth: false }).catch(function () {});
+      clearSession();
+      return p;
+    },
 
     productos: {
       listar: function (q) { return request('GET', '/productos', { query: q }); },          // {q, incluirInactivos}
@@ -149,10 +176,8 @@ var api = (function () {
       obtener: function (id) { return request('GET', '/dte/' + id); },
       /** GET /dte/:id/pdf → Promise<Blob> (binario, no JSON). Los errores llegan como ApiError. */
       pdf: function (id) {
-        var headers = { 'Accept': 'application/pdf' };
-        var token = getToken();
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        return fetch(API_CONFIG.BASE_URL + '/dte/' + id + '/pdf', { headers: headers }).then(function (res) {
+        var headers = cabecerasSesion('GET', { 'Accept': 'application/pdf' });
+        return fetch(API_CONFIG.BASE_URL + '/dte/' + id + '/pdf', { headers: headers, credentials: 'same-origin' }).then(function (res) {
           if (res.ok) return res.blob();
           return res.json().catch(function () { return null; }).then(function (json) {
             return procesar(res.status, json || { ok: false, error: { codigo: 'ERROR_INTERNO', mensaje: 'No se pudo generar el PDF (HTTP ' + res.status + ')' } });

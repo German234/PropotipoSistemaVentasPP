@@ -4,7 +4,12 @@ Base: `http://localhost:3000/api` · JSON en camelCase · ambiente MH `"00"`.
 
 ## Generalidades
 
-**Autenticación:** todas las rutas excepto `POST /api/auth/login` y `GET /api/health` requieren `Authorization: Bearer <token>`.
+**Autenticación:** todas las rutas excepto `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/health` requieren sesión, por una de dos vías:
+
+- `Authorization: Bearer <token>` (clientes de API, Postman, pruebas). No necesita CSRF.
+- Cookie HttpOnly `pos_token` (el frontend del navegador; la pone el login). Toda petición `POST`/`PUT`/`DELETE` con cookie exige el header `X-CSRF-Token` igual a la cookie `pos_csrf`; si falta o no coincide → 403 `CSRF_INVALIDO`.
+
+**CORS:** solo los orígenes de `CORS_ORIGENES` (por defecto `http://localhost:PORT` y `http://127.0.0.1:PORT`). Ver `docs/SEGURIDAD.md`.
 
 **Respuesta estándar**
 
@@ -22,12 +27,16 @@ Base: `http://localhost:3000/api` · JSON en camelCase · ambiente MH `"00"`.
 | `CREDENCIALES` | 401 | Usuario o contraseña incorrectos |
 | `VALIDACION` | 400 | Datos de entrada inválidos |
 | `SIN_PERMISO` | 403 | El rol del usuario no permite la operación |
+| `CSRF_INVALIDO` | 403 | Petición con cookie de sesión sin `X-CSRF-Token` válido |
+| `DEMASIADOS_INTENTOS` | 429 | Login bloqueado temporalmente por intentos fallidos (header `Retry-After` en segundos) |
 | `NO_ENCONTRADO` | 404 | El recurso no existe |
 | `ESTADO_INVALIDO` | 409 | La operación no aplica al estado actual del DTE |
 | `STOCK_INSUFICIENTE` | 409 | No hay existencias suficientes |
 | `DB_NO_DISPONIBLE` | 503 | No hay conexión con SQL Server |
 | `MH_NO_DISPONIBLE` | 503 | MH (simulado) no respondió a un evento de invalidación o de contingencia (`X-Simular: contingencia` o `timeout`) |
-| `ERROR_INTERNO` | 500 | Error no controlado |
+| `ERROR_INTERNO` | 500 | Error no controlado. Mensaje siempre genérico: `"Error interno del servidor (referencia ABCD1234)"`; el detalle solo queda en el log con esa referencia |
+
+Un cuerpo de más de 1 MB → 413 `VALIDACION`.
 
 **Header `X-Simular`** (opcional, en emisión, reintento, consulta, invalidación y evento de contingencia): `ok` (por defecto) | `rechazo` | `contingencia` | `timeout`. Fuerza el resultado de MH para la demo. `timeout` (C3) = MH **sí recibió y selló** el documento pero la respuesta no llegó: para el POS es igual que `contingencia` (no hay respuesta), pero MH lo guarda y la cola de consultas lo descubre después. En eventos (invalidación, contingencia) `timeout` se trata como `contingencia`.
 
@@ -42,10 +51,13 @@ Base: `http://localhost:3000/api` · JSON en camelCase · ambiente MH `"00"`.
 Ejecuta `SELECT 1` contra SQL Server.
 
 ```json
-{ "ok": true, "data": { "api": "ok", "db": "ok", "ambiente": "00", "fecha": "2026-11-04T21:30:00.000Z" } }
+{ "ok": true, "data": { "api": "ok", "db": "ok", "ambiente": "00", "fecha": "2026-11-04T21:30:00.000Z",
+  "demo": { "credenciales": [ { "usuario": "admin", "password": "admin123", "rol": "ADMIN" }, { "usuario": "vendedor", "password": "vendedor123", "rol": "VENDEDOR" } ] } } }
 ```
 
-Sin conexión → 503 `{ "ok": false, "error": { "codigo": "DB_NO_DISPONIBLE", "mensaje": "No se pudo conectar a la base de datos: ..." } }`
+`demo` (Fase 3): credenciales de prueba para el login. Solo si `DEMO_CREDENCIALES=1`, o si no está definida, `NODE_ENV` no es `production` y se abre desde `localhost`/`127.0.0.1`; en otro caso `null`.
+
+Sin conexión → 503 `{ "ok": false, "error": { "codigo": "DB_NO_DISPONIBLE", "mensaje": "No se pudo conectar a la base de datos" } }` (el error del driver solo va al log).
 
 ---
 
@@ -67,7 +79,19 @@ Sin conexión → 503 `{ "ok": false, "error": { "codigo": "DB_NO_DISPONIBLE", "
 }
 ```
 
-El token dura 8 h. Su payload es `{ id, usuario, nombre, rol }`. Roles: `ADMIN`, `VENDEDOR`. Datos incorrectos → 401 `CREDENCIALES`; faltan campos → 400 `VALIDACION`.
+El token dura 8 h. Su payload es `{ id, usuario, nombre, rol, csrf }`. Roles: `ADMIN`, `VENDEDOR`. Datos incorrectos → 401 `CREDENCIALES`; faltan campos → 400 `VALIDACION`.
+
+Además deja dos cookies (`SameSite=Strict`, `Path=/`, 8 h; `Secure` si `COOKIE_SECURE=1` o HTTPS): `pos_token` (el JWT, **HttpOnly**) y `pos_csrf` (legible por el frontend, para `X-CSRF-Token`).
+
+Límite de intentos: 5 fallos (401) por usuario + IP o 20 por IP en 15 min bloquean ese login 15 min → 429 `DEMASIADOS_INTENTOS` con `Retry-After`, aunque la contraseña sea correcta. Un login correcto reinicia el contador de su usuario + IP. Configurable con `LOGIN_MAX_INTENTOS`, `LOGIN_MAX_INTENTOS_IP`, `LOGIN_VENTANA_MIN`, `LOGIN_BLOQUEO_MIN`.
+
+### POST /api/auth/logout (sin token)
+
+Borra las cookies `pos_token` y `pos_csrf` → `{ "ok": true, "data": { "sesion": "cerrada" } }`. El JWT no se revoca en el servidor (sigue válido hasta vencer si alguien lo copió).
+
+### GET /api/auth/sesion
+
+Usuario de la sesión actual (cookie o Bearer) → `{ "ok": true, "data": { "usuario": { "id": 1, "nombre": "Administrador", "rol": "ADMIN" } } }`; sin sesión → 401. El frontend lo usa al recargar la página.
 
 ---
 

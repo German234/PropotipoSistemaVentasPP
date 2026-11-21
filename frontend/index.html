@@ -459,9 +459,8 @@
         <a href="#" class="link" onclick="return false">¿Olvidó su contraseña?</a>
       </div>
       <button class="btn btn-primary btn-block" id="login-btn" onclick="doLogin()">Ingresar</button>
-      <div class="login-roles">
-        Usuarios de prueba: <b>admin</b> / admin123 · <b>vendedor</b> / vendedor123
-      </div>
+      <!-- Credenciales de prueba: las llena app.js desde GET /api/health (demo) solo en el entorno académico local -->
+      <div class="login-roles" id="login-demo" style="display:none"></div>
     </div>
   </div>
 </div>

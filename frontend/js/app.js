@@ -1304,8 +1304,15 @@
   }
 
   renderInventory(); renderCart(); renderCatalog(''); renderClientForm(); renderClientes();
-  // F2: restaurar la sesión guardada (el token se valida en la primera llamada a la API)
-  if(api.isLoggedIn() && api.getUsuario()) iniciarSesion(api.getUsuario());
+  // Fase 3: la sesión vive en una cookie HttpOnly; al recargar se pregunta al backend quién es el usuario
+  api.sesion().then(function(u){ if(!usuarioActual) iniciarSesion(u); }).catch(function(){ /* sin sesión: queda el login */ });
+  // Credenciales de prueba solo si el backend lo indica (entorno académico local)
+  api.health().then(function(h){
+    var el = document.getElementById('login-demo');
+    if(!el || !h || !h.demo || !h.demo.credenciales) return;
+    el.innerHTML = 'Usuarios de prueba: ' + h.demo.credenciales.map(function(c){ return '<b>'+_h(c.usuario)+'</b> / '+_h(c.password); }).join(' · ');
+    el.style.display = '';
+  }).catch(function(){ /* sin health: no se muestran */ });
   renderHistorial(); renderBitacora();
 
   function toggleSidebar(role){

@@ -743,7 +743,12 @@ var MockApi = (function () {
   /* ---------- router ---------- */
   function route(method, path, query, body, headers) {
     var m, u;
-    if (method === 'GET' && path === '/health') return { api: 'ok', db: 'ok', ambiente: '00', fecha: new Date().toISOString() };
+    if (method === 'GET' && path === '/health') {
+      // modo mock = entorno académico local: se muestran las credenciales de prueba
+      return { api: 'ok', db: 'ok', ambiente: '00', fecha: new Date().toISOString(),
+        demo: { credenciales: db.usuarios.map(function (x) { return { usuario: x.usuario, password: x.password, rol: x.rol }; }) } };
+    }
+    if (method === 'POST' && path === '/auth/logout') return { sesion: 'cerrada' };
     if (method === 'POST' && path === '/auth/login') {
       if (!body.usuario || !body.password) err('VALIDACION', 'usuario y password son obligatorios');
       var us = db.usuarios.filter(function (x) { return x.usuario === body.usuario && x.password === body.password; })[0];
@@ -752,6 +757,7 @@ var MockApi = (function () {
       return { token: emitirToken(us), usuario: { id: us.id, nombre: us.nombre, rol: us.rol } };
     }
     u = leerToken(headers);
+    if (method === 'GET' && path === '/auth/sesion') return { usuario: { id: u.id, nombre: u.nombre, rol: u.rol } };
 
     if (path === '/productos' && method === 'GET') return listarProductos(query);
     if (path === '/productos' && method === 'POST') {

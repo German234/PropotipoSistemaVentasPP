@@ -23,6 +23,7 @@
 - **P1 PDF real del DTE — HECHO (2026-11-06).** `GET /api/dte/:id/pdf` genera la representación gráfica con la plantilla del PDF de ejemplo; "Descargar PDF" (modal de correo en Transacciones) la descarga. Cambio de contrato (ver abajo).
 - **P2 Datos completos del cliente con catálogos MH — HECHO (2026-11-06).** El formulario de clientes selecciona departamento → municipio → distrito (CAT-012/013, reforma 2024) y tipo de documento (CAT-022); captura nombre comercial y teléfono; el backend valida los códigos y los copia al receptor del DTE. Nuevo `GET /api/catalogos`. Cambio de contrato (ver abajo).
 - **S1 Autorización de invalidación — HECHO (2026-11-20).** `POST /api/dte/:id/invalidar` solo para `ADMIN` (`requireRol` + política `ROLES_INVALIDAR`); VENDEDOR → 403 `SIN_PERMISO`; la UI oculta "Anular" a quien no tiene permiso. **Decisión de negocio pendiente de validar con el Product Owner** (¿qué roles pueden invalidar?). 329 pruebas en verde. Cambio de contrato (ver abajo).
+- **S2 Seguridad (Fase 3) — HECHO (2026-11-20).** CORS por lista, 500 genéricos, límite de intentos de login (429), sesión del navegador en cookie HttpOnly + CSRF (Bearer sigue igual), credenciales demo solo en local, cabeceras + CSP, `uuid` eliminado. Detalle, riesgos y pruebas en `docs/SEGURIDAD.md`. 383 pruebas en verde. Cambio de contrato (ver abajo).
 - **KAN-34 Edición de clientes — HECHO (2026-11-20).** Botón Editar por cliente, formulario en modo edición con catálogos MH en cascada, `PUT /api/clientes/:id`, actualización de la fila sin recargar. 346 pruebas en verde. Sin cambios de contrato.
 - ✅ **MVP COMPLETO (2026-11-04).** Backend B1–B4 + frontend F1–F4 integrados: login con roles, catálogos, emisión 01/03/05, invalidación, contingencia y reintento, transacciones y bitácora, todo contra SQL Server. Guion de demo verificado de punta a punta.
 
@@ -42,6 +43,11 @@
 | `backend/src/server.js` | Carga `.env`, levanta el servidor y arranca los temporizadores del lote automático y de la cola de consultas a MH |
 | `backend/src/app.js` | Express: cors, json, rutas `/api/*`, 404 API, estáticos de `frontend/`, manejador de errores. **Registrar aquí las rutas nuevas** |
 | `backend/src/config/db.js` | Pool mssql lazy; `query(sql, params)`; `withTransaction(async ({tx, query}) => ...)` |
+| `backend/src/config/seguridad.js` | Config de seguridad desde `.env`: orígenes CORS, límite de login, cookie Secure, credenciales demo, JWT_SECRET débil |
+| `backend/src/middleware/seguridad.js` | `corsConfigurado` (lista de orígenes) y `cabecerasSeguridad` (CSP, nosniff, frame, referrer, no-store en /api) |
+| `backend/src/middleware/limiteLogin.js` | Límite de intentos fallidos de login en memoria (usuario+IP e IP) → 429 |
+| `backend/src/utils/cookies.js` | Cookies `pos_token` (HttpOnly) y `pos_csrf`: leer, poner y borrar |
+| `docs/SEGURIDAD.md` | Fase 3: cada cambio de seguridad, riesgo corregido, prueba y variables de entorno |
 | `backend/src/config/politicas.js` | Políticas de autorización por operación: `ROLES_INVALIDAR = ['ADMIN']` (pendiente de validar con el PO) |
 | `backend/src/utils/respuesta.js` | `AppError(codigo, mensaje, status)`, `ok(res, data, status)`, `asyncHandler(fn)` |
 | `backend/src/middleware/errores.js` | `noEncontrado` (404) y `manejadorErrores` → `{ok:false,error:{codigo,mensaje}}` |
@@ -135,6 +141,12 @@
   - Todo JSON DTE y evento generado se valida con ajv contra `schemas-mh/` (`multipleOfPrecision`).
   - Bug corregido: `utils/dinero.js` `redondear2` devolvía `NaN` con residuos en notación exponencial (`4.4e-16`) → NC de 3 de 10 × $1.10 respondía 500. Ahora < 0.005 → 0. Con pruebas de regresión.
   - Matriz requisito → prueba en `docs/PRUEBAS.md`. Pendiente (fuera de alcance): pruebas automatizadas del frontend.
+
+- [x] **S2 — Seguridad, Fase 3 (2026-11-20).** Detalle completo en `docs/SEGURIDAD.md`.
+  - Archivos nuevos: `config/seguridad.js`, `middleware/seguridad.js`, `middleware/limiteLogin.js`, `utils/cookies.js`, `tests/integration/seguridad.test.js`, `docs/SEGURIDAD.md`. Modificados: `app.js` (cabeceras, CORS, `x-powered-by` off, `TRUST_PROXY`, `/js/mocks.js` vacío fuera de local), `server.js` (aviso/bloqueo por JWT_SECRET débil, log de CORS), `middleware/auth.js` (Bearer o cookie + CSRF, `HS256` fijo), `middleware/errores.js` (500 genérico con referencia, 413), `routes/auth.js` + `controllers/authController.js` (límite, cookies, `logout`, `sesion`), `services/authService.js` (claim `csrf`, hash de relleno), `routes/health.js` (sin error del driver; `demo`), `package.json` (sin `uuid`), `.env.example`, `tests/unit/middleware.test.js`; frontend `js/api.js` (sin token en localStorage, `X-CSRF-Token`, `sesion()`, `logout()` al servidor), `js/app.js` (restaura sesión con `/auth/sesion`, credenciales demo desde health), `js/mocks.js` (`/auth/sesion`, `/auth/logout`, `demo`), `index.html` (sin credenciales fijas).
+  - Decisiones: Bearer se conserva (pruebas y clientes de API, sin CSRF); el navegador usa la cookie. CSRF = claim del JWT comparado con `X-CSRF-Token`. CSP con `script-src-attr 'unsafe-inline'` para no reescribir los ~100 `onclick`. Límite de login en memoria (una instancia). Sin dependencias nuevas.
+  - Verificado: 383/383 pruebas; recorrido en Edge sin ventana (CSP con clics reales, cookies, CSRF, PDF, recarga, logout, 429) y de nuevo el de KAN-34; modo mock probado en Node.
+  - Pendiente: migrar `onclick` a `addEventListener` para una CSP estricta; revocación de JWT en el servidor; límite de login compartido (Redis) si hay varias instancias; cambiar contraseñas del seed en un despliegue real.
 
 - [x] **S1 — Autorización de invalidación (2026-11-20).**
   - Archivos: nuevo `backend/src/config/politicas.js`; modificados `routes/dte.js` (`requireRol(...ROLES_INVALIDAR)` en `/:id/invalidar`), `tests/integration/invalidacion.test.js` (la prueba "VENDEDOR puede invalidar" pasa a: sin token 401 / VENDEDOR 403 sin efectos en estado, stock ni bitácora / ADMIN funcional), `frontend/js/app.js` (`puedeInvalidar()` oculta "Anular" en Transacciones y en el modal del DTE; guarda en `abrirAnular`), `frontend/js/mocks.js` (`requireAdmin` en invalidar), `docs/API.md`.
@@ -284,6 +296,7 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 
 ## Cambios de contrato
 
+- S2: autenticación también por cookie HttpOnly `pos_token` (+ `X-CSRF-Token` en escrituras; 403 `CSRF_INVALIDO`); login pone cookies y su JWT trae el claim `csrf`; nuevos `POST /api/auth/logout` y `GET /api/auth/sesion`; 429 `DEMASIADOS_INTENTOS` en login; 500 con mensaje genérico; 413 por cuerpo > 1 MB; `GET /api/health` agrega `demo` y su 503 ya no incluye el error del driver; CORS solo para `CORS_ORIGENES`.
 - S1: `POST /api/dte/:id/invalidar` pasa de "cualquier rol autenticado" a solo `ADMIN`; otro rol → 403 `SIN_PERMISO`.
 - P2: clientes con `nombreComercial`, `tipoDocumento`, `numDocumento`, `telefono` y `direccion` **objeto** `{departamento, municipio, distrito, complemento}` con códigos MH validados (antes texto libre); CONTRIBUYENTE exige dirección completa y `codActividad` de 5–6 dígitos (antes 2–6). Nuevo `GET /api/catalogos`. `GET /api/emisor` agrega `direccion.distrito` (seed: municipio 23 San Salvador Centro, distrito 14). El receptor del DTE lleva documento, teléfono, nombre comercial (03) y la dirección del cliente.
 - P1: nuevo `GET /api/dte/:id/pdf` (cualquier rol) → `application/pdf` (no JSON; errores sí en JSON estándar).
