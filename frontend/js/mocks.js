@@ -61,8 +61,8 @@ var MockApi = (function () {
   /* ---------- estado (seed de db/02_seed.sql) ---------- */
   var db = {
     usuarios: [
-      { id: 1, usuario: 'admin', password: 'admin123', nombre: 'Administrador', rol: 'ADMIN' },
-      { id: 2, usuario: 'vendedor', password: 'vendedor123', nombre: 'Vendedor de Turno', rol: 'VENDEDOR' }
+      { id: 1, usuario: 'admin', password: 'admin123', nombre: 'Administrador', rol: 'ADMIN', activo: true, creadoEn: '2026-11-04T08:00:00' },
+      { id: 2, usuario: 'vendedor', password: 'vendedor123', nombre: 'Vendedor de Turno', rol: 'VENDEDOR', activo: true, creadoEn: '2026-11-04T08:00:00' }
     ],
     emisor: {
       nit: '06140101001010', nrc: '100001', nombre: 'Batallón Atlacatl, S.A. de C.V.',
@@ -106,7 +106,8 @@ var MockApi = (function () {
     mhRegistro: {},   // C3: lo que MH "recibió" en un timeout, por codigoGeneracion { jsonDte, firmador, respuestaMh }
     consultas: { activo: true, intervaloSeg: 60, ultimaConsulta: null, proxima: null, timer: null },  // C3: cola de consultas  // C2: lote automático (sin temporizador en el mock)
     bitacora: [],
-    seq: { producto: 10, cliente: 4, dte: 0, evento: 0, eventoCont: 0, bitacora: 0 }
+    borradores: [],   // Fase 6
+    seq: { producto: 10, cliente: 4, dte: 0, evento: 0, eventoCont: 0, bitacora: 0, usuario: 2, borrador: 0 }
   };
 
   /* ---------- auth (token falso: base64url del payload) ---------- */
@@ -642,6 +643,7 @@ var MockApi = (function () {
   }
 
   function invalidar(id, body, u, modo) {
+    requireAdmin(u); // ROLES_INVALIDAR = ['ADMIN'] (igual que la API)
     var d = porId(db.dte, id, 'DTE');
     if (d.estado !== 'PROCESADO') err('ESTADO_INVALIDO', 'Solo se puede invalidar un DTE PROCESADO (estado actual: ' + d.estado + ')');
     if (d.tipoDte === '03' && db.dte.some(function (n) { return n.dteRelacionadoId === d.id && (n.estado === 'PROCESADO' || n.estado === 'CONTINGENCIA'); }))
@@ -699,7 +701,7 @@ var MockApi = (function () {
     }).slice().reverse().map(function (d) {
       return { id: d.id, tipoDte: d.tipoDte, numeroControl: d.numeroControl, codigoGeneracion: d.codigoGeneracion,
         selloRecibido: d.selloRecibido, estado: d.estado, fechaEmision: d.fechaEmision, receptor: receptorTexto(d),
-        clienteId: d.clienteId, total: d.total, dteRelacionadoId: d.dteRelacionadoId };
+        clienteId: d.clienteId, total: d.total, dteRelacionadoId: d.dteRelacionadoId, usuario: d.usuario };
     });
   }
   function obtenerDte(id) {
@@ -739,18 +741,142 @@ var MockApi = (function () {
     }).slice().reverse().slice(0, lim).map(clone);
   }
 
+  /* ---------- Fase 6: usuarios, borradores, reportes y correo simulado (misma forma que docs/API.md) ---------- */
+  function usuarioOut(x) { return { id: x.id, usuario: x.usuario, nombre: x.nombre, rol: x.rol, activo: x.activo, creadoEn: x.creadoEn }; }
+  function validarPassword(pw) { if (typeof pw !== 'string' || pw.length < 8) err('VALIDACION', 'password debe tener al menos 8 caracteres'); return pw; }
+  function validarRol(r) { if (['ADMIN', 'VENDEDOR'].indexOf(r) === -1) err('VALIDACION', 'rol debe ser ADMIN o VENDEDOR'); return r; }
+  function crearUsuario(body, u) {
+    var login = String(body.usuario || '').trim();
+    if (!/^[A-Za-z0-9._-]{3,50}$/.test(login)) err('VALIDACION', 'usuario debe tener de 3 a 50 caracteres: letras, dígitos, punto, guion o guion bajo');
+    var nombre = String(body.nombre || '').trim(); if (!nombre) err('VALIDACION', 'nombre es obligatorio');
+    var x = { id: 0, usuario: login, nombre: nombre, rol: validarRol(body.rol), password: validarPassword(body.password), activo: true, creadoEn: isoLocal(new Date()) };
+    if (db.usuarios.some(function (o) { return o.usuario === login; })) err('VALIDACION', 'Ya existe el usuario ' + login);
+    x.id = ++db.seq.usuario; db.usuarios.push(x);
+    bitacora(u.usuario, 'CREAR', 'usuario', x.id, 'Usuario ' + login + ' creado', usuarioOut(x));
+    return { status: 201, data: usuarioOut(x) };
+  }
+  function actualizarUsuario(x, body, u) {
+    if (body.usuario !== undefined) err('VALIDACION', 'usuario no se puede cambiar');
+    var nuevo = {
+      nombre: body.nombre !== undefined ? String(body.nombre).trim() : x.nombre,
+      rol: body.rol !== undefined ? validarRol(body.rol) : x.rol,
+      activo: body.activo !== undefined ? Boolean(body.activo) : x.activo
+    };
+    if (!nuevo.nombre) err('VALIDACION', 'nombre es obligatorio');
+    if (body.password !== undefined) validarPassword(body.password);
+    if (x.id === u.id && !nuevo.activo) err('VALIDACION', 'No puedes desactivar tu propio usuario');
+    if (x.id === u.id && nuevo.rol !== 'ADMIN') err('VALIDACION', 'No puedes quitarte el rol ADMIN');
+    if (x.rol === 'ADMIN' && x.activo && (nuevo.rol !== 'ADMIN' || !nuevo.activo) &&
+        !db.usuarios.some(function (o) { return o.id !== x.id && o.rol === 'ADMIN' && o.activo; })) err('ESTADO_INVALIDO', 'Debe quedar al menos un ADMIN activo');
+    Object.assign(x, nuevo); if (body.password !== undefined) x.password = body.password;
+    var cambios = clone(body); if (cambios.password !== undefined) cambios.password = '(cambiada)';
+    bitacora(u.usuario, 'ACTUALIZAR', 'usuario', x.id, 'Usuario ' + x.usuario + ' actualizado', { cambios: cambios });
+    return usuarioOut(x);
+  }
+
+  function normalizarBorrador(body) {
+    if (['01', '03'].indexOf(body.tipoDte) === -1) err('VALIDACION', 'tipoDte debe ser 01 o 03');
+    var clienteId = body.clienteId == null || body.clienteId === '' ? null : Number(body.clienteId);
+    if (clienteId !== null) {
+      var c = db.clientes.filter(function (x) { return x.id === clienteId && x.activo; })[0];
+      if (!c) err('NO_ENCONTRADO', 'Cliente ' + clienteId + ' no existe o está inactivo');
+    }
+    if (!Array.isArray(body.items) || !body.items.length) err('VALIDACION', 'items debe tener al menos un producto');
+    var por = {};
+    body.items.forEach(function (it) {
+      var id = Number(it.productoId), q = Number(it.cantidad);
+      if (!Number.isInteger(q) || q < 1) err('VALIDACION', 'cantidad debe ser un entero >= 1');
+      var p = db.productos.filter(function (x) { return x.id === id && x.activo; })[0];
+      if (!p) err('NO_ENCONTRADO', 'Producto ' + id + ' no existe o está inactivo');
+      por[id] = (por[id] || 0) + q;
+    });
+    return { tipoDte: body.tipoDte, clienteId: clienteId, items: Object.keys(por).map(function (k) { return { productoId: Number(k), cantidad: por[k] }; }) };
+  }
+  function borradorOut(b) {
+    var cent = 0;
+    var items = b.items.map(function (it) {
+      var p = db.productos.filter(function (x) { return x.id === it.productoId; })[0];
+      var disp = !!(p && p.activo);
+      if (disp) cent += Math.round((b.tipoDte === '01' ? Math.round(Math.round(p.precio * 100) * 113 / 100) / 100 : p.precio) * 100) * it.cantidad;
+      return { productoId: it.productoId, cantidad: it.cantidad, codigo: p ? p.codigo : null, descripcion: p ? p.descripcion : null,
+        precio: p ? p.precio : null, stock: p ? p.stock : null, disponible: disp };
+    });
+    var total = b.tipoDte === '01' ? cent / 100 : r2(cent / 100 + Math.round(cent * 13 / 100) / 100);
+    var c = b.clienteId ? db.clientes.filter(function (x) { return x.id === b.clienteId; })[0] : null;
+    return { id: b.id, tipoDte: b.tipoDte, clienteId: b.clienteId, cliente: c ? { id: c.id, nombre: c.nombre, tipo: c.tipo } : null,
+      usuario: b.usuario, items: items, totalEstimado: total, creadoEn: b.creadoEn, actualizadoEn: b.actualizadoEn };
+  }
+  function borradorDe(id, u) {
+    var b = db.borradores.filter(function (x) { return x.id === Number(id) && x.usuario === u.usuario; })[0];
+    if (!b) err('NO_ENCONTRADO', 'Borrador ' + id + ' no existe');
+    return b;
+  }
+
+  function resumenReportes(q) {
+    if (q.tipo && ['01', '03', '05'].indexOf(q.tipo) === -1) err('VALIDACION', 'tipo debe ser 01, 03, 05');
+    var hoy = new Date();
+    var desde = q.desde || ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta = q.hasta || ymd(hoy);
+    if (desde > hasta) err('VALIDACION', 'desde no puede ser posterior a hasta');
+    var lista = db.dte.filter(function (d) { var f = d.fechaEmision.slice(0, 10); return f >= desde && f <= hasta && (!q.tipo || d.tipoDte === q.tipo); });
+    var porEstado = { PROCESADO: 0, CONTINGENCIA: 0, RECHAZADO: 0, INVALIDADO: 0 };
+    var dias = {}, orden = [];
+    for (var d = new Date(desde + 'T00:00:00'); ymd(d) <= hasta; d.setDate(d.getDate() + 1)) { dias[ymd(d)] = { fecha: ymd(d), documentos: 0, total: 0 }; orden.push(ymd(d)); }
+    var tipos = {}; (q.tipo ? [q.tipo] : ['01', '03', '05']).forEach(function (t) { tipos[t] = { tipoDte: t, documentos: 0, total: 0 }; });
+    var vend = {}, ventas = 0, nc = 0, iva = 0, docs = 0;
+    lista.forEach(function (x) {
+      porEstado[x.estado] = (porEstado[x.estado] || 0) + 1;
+      if (x.estado !== 'PROCESADO' && x.estado !== 'CONTINGENCIA') return;
+      var c = Math.round(x.total * 100), us = db.usuarios.filter(function (o) { return o.usuario === x.usuario; })[0];
+      tipos[x.tipoDte].documentos++; tipos[x.tipoDte].total += c;
+      vend[x.usuario] = vend[x.usuario] || { usuario: x.usuario, nombre: us ? us.nombre : x.usuario, documentos: 0, total: 0, notasCredito: 0 };
+      if (x.tipoDte !== '05') {
+        ventas += c; iva += Math.round(x.iva * 100); docs++;
+        var di = dias[x.fechaEmision.slice(0, 10)]; if (di) { di.documentos++; di.total += c; }
+        vend[x.usuario].documentos++; vend[x.usuario].total += c;
+      } else { nc += c; iva -= Math.round(x.iva * 100); vend[x.usuario].notasCredito += c; }
+    });
+    function dol(o, k) { o[k] = o[k] / 100; return o; }
+    return {
+      periodo: { desde: desde, hasta: hasta, tipo: q.tipo || null },
+      totales: { ventasBrutas: ventas / 100, notasCredito: nc / 100, ventasNetas: (ventas - nc) / 100, iva: iva / 100, documentos: docs,
+        ticketPromedio: docs ? Math.round(ventas / docs) / 100 : 0 },
+      porEstado: porEstado,
+      porDia: orden.map(function (k) { return dol(dias[k], 'total'); }),
+      porTipo: Object.keys(tipos).map(function (k) { return dol(tipos[k], 'total'); }),
+      porVendedor: Object.keys(vend).map(function (k) { return dol(dol(vend[k], 'total'), 'notasCredito'); })
+        .sort(function (a, b) { return b.total - a.total; })
+    };
+  }
+
+  var MENSAJE_CORREO = 'Envío simulado: no se envió ningún correo (el prototipo no tiene servidor SMTP). Quedó registrado en la bitácora.';
+  function correoSimulado(id, body, u) {
+    var d = porId(db.dte, id, 'DTE');
+    var correo = String(body.correo || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) err('VALIDACION', 'correo no tiene un formato válido');
+    if (d.estado === 'RECHAZADO') err('ESTADO_INVALIDO', 'Un DTE rechazado por MH no se entrega al receptor');
+    bitacora(u.usuario, 'CORREO_SIMULADO', 'dte', d.id, MENSAJE_CORREO, { numeroControl: d.numeroControl, correo: correo },
+      { codigoGeneracion: d.codigoGeneracion, resultado: 'SIMULADO' });
+    return { dteId: d.id, numeroControl: d.numeroControl, correo: correo, enviado: false, simulado: true, mensaje: MENSAJE_CORREO };
+  }
+
   /* ---------- router ---------- */
   function route(method, path, query, body, headers) {
     var m, u;
-    if (method === 'GET' && path === '/health') return { api: 'ok', db: 'ok', ambiente: '00', fecha: new Date().toISOString() };
+    if (method === 'GET' && path === '/health') {
+      // modo mock = entorno académico local: se muestran las credenciales de prueba
+      return { api: 'ok', db: 'ok', ambiente: '00', fecha: new Date().toISOString(),
+        demo: { credenciales: db.usuarios.map(function (x) { return { usuario: x.usuario, password: x.password, rol: x.rol }; }) } };
+    }
+    if (method === 'POST' && path === '/auth/logout') return { sesion: 'cerrada' };
     if (method === 'POST' && path === '/auth/login') {
       if (!body.usuario || !body.password) err('VALIDACION', 'usuario y password son obligatorios');
-      var us = db.usuarios.filter(function (x) { return x.usuario === body.usuario && x.password === body.password; })[0];
+      var us = db.usuarios.filter(function (x) { return x.activo && x.usuario === body.usuario && x.password === body.password; })[0];
       if (!us) { bitacora(body.usuario, 'LOGIN_FALLIDO', 'usuario', null, 'Intento de inicio de sesión fallido', null); err('CREDENCIALES', 'Usuario o contraseña incorrectos'); }
       bitacora(us.usuario, 'LOGIN', 'usuario', us.id, 'Inicio de sesión', null);
       return { token: emitirToken(us), usuario: { id: us.id, nombre: us.nombre, rol: us.rol } };
     }
     u = leerToken(headers);
+    if (method === 'GET' && path === '/auth/sesion') return { usuario: { id: u.id, nombre: u.nombre, rol: u.rol } };
 
     if (path === '/productos' && method === 'GET') return listarProductos(query);
     if (path === '/productos' && method === 'POST') {
@@ -811,6 +937,42 @@ var MockApi = (function () {
     if (method === 'PUT' && path === '/contingencia/programacion') return programar(body, u);
     if (method === 'GET' && path === '/contingencia') return db.eventosCont.slice().reverse().map(function (e) { return eventoContOut(e, false); });
     if (method === 'GET' && (m = /^\/contingencia\/(\d+)$/.exec(path))) return eventoContOut(porId(db.eventosCont, m[1], 'Evento de contingencia'), true);
+
+    // Fase 6
+    if (method === 'POST' && (m = /^\/dte\/(\d+)\/correo$/.exec(path))) return correoSimulado(m[1], body, u);
+    if (path === '/usuarios' || /^\/usuarios\/\d+$/.test(path)) {
+      requireAdmin(u);
+      if (path === '/usuarios' && method === 'GET') return db.usuarios.filter(function (x) { return query.incluirInactivos == 1 || x.activo; })
+        .slice().sort(function (a, b) { return a.usuario < b.usuario ? -1 : 1; }).map(usuarioOut);
+      if (path === '/usuarios' && method === 'POST') return crearUsuario(body, u);
+      var ux = porId(db.usuarios, path.split('/')[2], 'Usuario');
+      if (method === 'GET') return usuarioOut(ux);
+      if (method === 'PUT') return actualizarUsuario(ux, body, u);
+    }
+    if (method === 'GET' && path === '/reportes/resumen') { requireAdmin(u); return resumenReportes(query); }
+    if (path === '/borradores' && method === 'GET') return db.borradores.filter(function (b) { return b.usuario === u.usuario; })
+      .slice().reverse().map(borradorOut);
+    if (path === '/borradores' && method === 'POST') {
+      var nb = normalizarBorrador(body), ahora = isoLocal(new Date());
+      nb.id = ++db.seq.borrador; nb.usuario = u.usuario; nb.creadoEn = ahora; nb.actualizadoEn = ahora; db.borradores.push(nb);
+      bitacora(u.usuario, 'CREAR', 'borrador', nb.id, 'Borrador creado', null);
+      return { status: 201, data: borradorOut(nb) };
+    }
+    if ((m = /^\/borradores\/(\d+)$/.exec(path))) {
+      var bo = borradorDe(m[1], u);
+      if (method === 'GET') return borradorOut(bo);
+      if (method === 'PUT') {
+        Object.assign(bo, normalizarBorrador(body), { actualizadoEn: isoLocal(new Date()) });
+        db.borradores.splice(db.borradores.indexOf(bo), 1); db.borradores.push(bo);   // el más reciente al final
+        bitacora(u.usuario, 'ACTUALIZAR', 'borrador', bo.id, 'Borrador actualizado', null);
+        return borradorOut(bo);
+      }
+      if (method === 'DELETE') {
+        db.borradores.splice(db.borradores.indexOf(bo), 1);
+        bitacora(u.usuario, 'ELIMINAR', 'borrador', bo.id, 'Borrador eliminado', null);
+        return { id: bo.id, eliminado: true };
+      }
+    }
 
     err('NO_ENCONTRADO', 'Ruta no encontrada: ' + method + ' /api' + path);
   }

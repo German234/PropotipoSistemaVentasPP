@@ -129,32 +129,6 @@ describe('Lote automático · próxima ejecución', () => {
   });
 });
 
-describe('Lote automático · temporizador', () => {
-  const svc = require('../../src/services/loteAutomaticoService');
-  let spy;
-  beforeEach(() => { spy = jest.spyOn(global, 'setTimeout'); });
-  afterEach(() => { svc.detener(); spy.mockRestore(); });
-
-  test('iniciar() programa el lote para la próxima hora configurada; detener() lo cancela', () => {
-    Object.assign(svc._estado, { activo: true, hora: '23:55' });
-    svc.iniciar();
-    const espera = spy.mock.calls[spy.mock.calls.length - 1][1];
-    expect(espera).toBeGreaterThan(0);
-    expect(espera).toBeLessThanOrEqual(24 * 3600 * 1000);
-    expect(Math.abs(Date.now() + espera - svc.proximaEjecucion('23:55').getTime())).toBeLessThan(1000);
-    expect(svc._estado.timer).not.toBeNull();
-    svc.detener();
-    expect(svc._estado.timer).toBeNull();
-  });
-
-  test('desactivado → no programa nada', () => {
-    Object.assign(svc._estado, { activo: false });
-    svc.iniciar();
-    expect(spy).not.toHaveBeenCalled();
-    expect(svc._estado.timer).toBeNull();
-    svc._estado.activo = true;
-  });
-});
 
 describe('MH simulado · modo timeout y consulta de DTE', () => {
   const mh = require('../../src/dte/simuladores/mhRecepcion');
@@ -190,26 +164,3 @@ describe('MH simulado · modo timeout y consulta de DTE', () => {
   });
 });
 
-describe('Cola de consultas · temporizador', () => {
-  const svc = require('../../src/services/consultaMhService');
-  let spy;
-  beforeEach(() => { spy = jest.spyOn(global, 'setTimeout'); });
-  afterEach(() => { svc.detener(); spy.mockRestore(); });
-
-  test('iniciar() programa el siguiente turno a intervaloSeg; detener() lo cancela', () => {
-    Object.assign(svc._estado, { activo: true, intervaloSeg: 45 });
-    svc.iniciar();
-    expect(spy.mock.calls[spy.mock.calls.length - 1][1]).toBe(45000);
-    expect(svc._estado.proxima).toBeInstanceOf(Date);
-    svc.detener();
-    expect(svc._estado.timer).toBeNull();
-    expect(svc._estado.proxima).toBeNull();
-  });
-
-  test('desactivada → no programa nada', () => {
-    Object.assign(svc._estado, { activo: false });
-    svc.iniciar();
-    expect(spy).not.toHaveBeenCalled();
-    svc._estado.activo = true;
-  });
-});

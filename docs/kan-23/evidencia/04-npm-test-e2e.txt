@@ -1,0 +1,26 @@
+
+Running 21 tests using 1 worker
+
+  ok  1 tests\e2e\01-login.spec.js:5:3 › Inicio de sesión › muestra las credenciales de prueba en el entorno local (989ms)
+  ok  2 tests\e2e\01-login.spec.js:12:3 › Inicio de sesión › contraseña incorrecta → mensaje claro y sigue en el login (1.2s)
+  ok  3 tests\e2e\01-login.spec.js:22:3 › Inicio de sesión › login correcto, la sesión sobrevive a la recarga y logout la cierra (1.3s)
+  ok  4 tests\e2e\02-roles.spec.js:5:3 › Restricciones por rol › VENDEDOR: no ve opciones de ADMIN en el menú, la venta ni el inventario (1.3s)
+  ok  5 tests\e2e\02-roles.spec.js:19:3 › Restricciones por rol › VENDEDOR: emite una factura pero no ve "Anular" en Transacciones (1.5s)
+  ok  6 tests\e2e\02-roles.spec.js:34:3 › Restricciones por rol › VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia) (974ms)
+  ok  7 tests\e2e\02-roles.spec.js:51:3 › Restricciones por rol › ADMIN: ve Contingencia, Administración, Simular MH y "Anular" (1.2s)
+  ok  8 tests\e2e\03-clientes.spec.js:12:3 › Clientes › registro de consumidor final con DUI (1.3s)
+  ok  9 tests\e2e\03-clientes.spec.js:22:3 › Clientes › registro de contribuyente con dirección del catálogo MH, edición y rechazo de datos inválidos (2.4s)
+  ok 10 tests\e2e\04-venta-dte.spec.js:8:3 › Venta y emisión de DTE › Factura 01 a consumidor final: PROCESADO con sello, JSON y descuento de stock (1.3s)
+  ok 11 tests\e2e\04-venta-dte.spec.js:23:3 › Venta y emisión de DTE › CCF 03 a un contribuyente: IVA desglosado y tributo 20 (1.5s)
+  ok 12 tests\e2e\04-venta-dte.spec.js:45:3 › Venta y emisión de DTE › CCF 03 sin cliente contribuyente → aviso y no emite (1.1s)
+  ok 13 tests\e2e\05-invalidacion-pdf.spec.js:10:3 › Invalidación y PDF › ADMIN anula una factura desde Transacciones: INVALIDADO, stock devuelto y bitácora (1.8s)
+  ok 14 tests\e2e\05-invalidacion-pdf.spec.js:40:3 › Invalidación y PDF › Descargar el PDF real del DTE desde Transacciones (6.4s)
+  ok 15 tests\e2e\06-contingencia.spec.js:5:3 › Contingencia › MH no responde → DTE en CONTINGENCIA → lote manual → PROCESADO con sello (1.9s)
+  ok 16 tests\e2e\06-contingencia.spec.js:35:3 › Contingencia › VENDEDOR: el DTE en contingencia se puede reintentar desde Transacciones (1.9s)
+  ok 17 tests\e2e\07-fase6.spec.js:10:3 › Fase 6 › Borradores: guardar, listar, continuar y se eliminan al emitir (2.1s)
+  ok 18 tests\e2e\07-fase6.spec.js:36:3 › Fase 6 › Correo: el modal dice que es simulado y la bitácora lo registra; nunca "enviado" (1.6s)
+  ok 19 tests\e2e\07-fase6.spec.js:54:3 › Fase 6 › Panel gerencial con los totales reales de la API (6.3s)
+  ok 20 tests\e2e\07-fase6.spec.js:75:3 › Fase 6 › Usuarios: crear un vendedor real que puede iniciar sesión y desactivarlo (2.6s)
+  ok 21 tests\e2e\07-fase6.spec.js:99:3 › Fase 6 › Configuración: emisor real de solo lectura y firmador identificado como simulado (1.3s)
+
+  21 passed (46.5s)

@@ -18,6 +18,9 @@
     if(role!=='vendedor' && !esAdmin()){ toast('Tu rol no tiene acceso a esa sección','warn'); return; }
     show('app-'+role); closeSidebars();
     if(role!=='vendedor') contarContingencia();
+    // Fase 6: datos reales al entrar
+    if(role==='gerente') cargarGerente();
+    if(role==='admin'){ var pa = document.querySelector('#app-admin .panel[style*="block"]'); if(!pa || pa.id==='a-usuarios') cargarUsuarios(); }
   }
 
   /* ===== Sesión (F2) ===== */
@@ -51,15 +54,19 @@
     show('app-vendedor'); setPanelById('vendedor','v-venta'); closeSidebars();
     cargarProductos(); buscarClientes(); cargarClientesVenta(); contarContingencia(); cargarCatalogos();
     ['v-simular','h-simular','ct-simular'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value='ok'; });
+    renderBorradorInfo();
   }
 
   function cerrarSesionLocal(){
     usuarioActual = null;
     document.body.classList.remove('rol-admin');
-    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null; catalogosMh = null;
+    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null; catalogosMh = null; limpiarFormCliente();
     closeDteResult(); closeAnular(); closeNotaCredito();
     dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; ctProg = null; ctConsultas = null; actualizarColaContingencia(0); renderHistorial(); renderBitacora(); renderContingencia();
     var ctm = document.getElementById('ct-motivo'); if(ctm) ctm.value = '';
+    // Fase 6
+    borradores = []; borradorActualId = null; renderBorradores(); renderBorradorInfo();
+    usuariosLista = []; limpiarFormUsuario(); renderUsuarios(); gResumen = null; gVentas = []; closeEmailModal();
     renderInventory(); renderCatalog(''); renderCart(); renderClientes(); renderClientForm();
     show('login'); closeSidebars();
   }
@@ -98,6 +105,11 @@
     if(usuarioActual && panelId==='v-historial') cargarHistorial();
     if(usuarioActual && panelId==='a-bitacora') cargarBitacora();
     if(usuarioActual && panelId==='a-contingencia') cargarContingencia();
+    // Fase 6
+    if(usuarioActual && panelId==='v-borradores') cargarBorradores();
+    if(usuarioActual && panelId==='a-usuarios') cargarUsuarios();
+    if(usuarioActual && panelId==='a-config') cargarEmisorConfig();
+    if(usuarioActual && role==='gerente' && !gResumen) cargarGerente();
   }
 
   /* ===== Inventario + catálogo + carrito (en memoria) ===== */
@@ -278,13 +290,15 @@
     var tb = document.getElementById('cli-tbody');
     if(!tb) return;
     if(clientes.length===0){
-      tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
     } else {
       tb.innerHTML = clientes.map(function(c){
-        return '<tr><td class="prod-name">'+_h(c.nombre)+(c.nombreComercial?'<div class="muted small">'+_h(c.nombreComercial)+'</div>':'')+'</td>'+
+        var editando = clienteEditando && clienteEditando.id===c.id;
+        return '<tr'+(editando?' style="background:var(--surface-2)"':'')+'><td class="prod-name">'+_h(c.nombre)+(c.nombreComercial?'<div class="muted small">'+_h(c.nombreComercial)+'</div>':'')+'</td>'+
           '<td>'+(c.tipo==='CONTRIBUYENTE'?'Contribuyente':'Consumidor')+'</td>'+
           '<td>'+_h(textoDocumento(c)||'—')+'</td><td>'+_h(c.nrc||'—')+'</td>'+
-          '<td>'+_h(textoUbicacion(c.direccion, true)||'—')+'</td><td>'+_h(c.correo||'—')+'</td></tr>';
+          '<td>'+_h(textoUbicacion(c.direccion, true)||'—')+'</td><td>'+_h(c.correo||'—')+'</td>'+
+          '<td class="num"><div class="row-actions"><button class="icon-btn" title="Editar cliente" onclick="editarCliente('+c.id+')">✏️</button></div></td></tr>';
       }).join('');
     }
     var n = document.getElementById('cli-count'); if(n) n.textContent = clientes.length + ' clientes';
@@ -297,7 +311,61 @@
     document.getElementById('cli-dir-req').style.display = esContrib ? '' : 'none';
   }
 
-  function crearCliente(){
+  /* ===== KAN-34: edición de clientes (PUT /api/clientes/:id con el mismo formulario) ===== */
+  var clienteEditando = null;      // cliente original (respuesta de la API) mientras se edita
+  var CLI_INPUTS = ['cli-nombre','cli-comercial','cli-numdoc','cli-nit','cli-nrc','cli-codact','cli-descact','cli-telefono','cli-correo','cli-complemento'];
+
+  function editarCliente(id){
+    // GET /:id para editar sobre los datos vigentes (no sobre una lista que pudo quedar vieja)
+    return Promise.all([cargarCatalogos(), api.clientes.obtener(id)]).then(function(r){
+      var c = r[1];
+      clienteEditando = c;
+      function set(elId, val){ document.getElementById(elId).value = val==null ? '' : val; }
+      set('cli-tipo', c.tipo); toggleCamposContribuyente();
+      set('cli-nombre', c.nombre); set('cli-comercial', c.nombreComercial);
+      set('cli-telefono', c.telefono); set('cli-correo', c.correo);
+      if(c.tipo==='CONTRIBUYENTE'){
+        set('cli-nit', c.nit); set('cli-nrc', c.nrc); set('cli-codact', c.codActividad); set('cli-descact', c.descActividad);
+        set('cli-tipodoc', ''); toggleNumDocumento();
+      } else {
+        ['cli-nit','cli-nrc','cli-codact','cli-descact'].forEach(function(x){ set(x, ''); });
+        set('cli-tipodoc', c.tipoDocumento); toggleNumDocumento(); set('cli-numdoc', c.numDocumento);
+      }
+      // Dirección: depto → municipio → distrito en cascada, igual que al registrar
+      var d = c.direccion || {};
+      set('cli-depto', d.departamento); cambiarDepartamento();
+      set('cli-municipio', d.municipio); cambiarMunicipio();
+      set('cli-distrito', d.distrito);
+      set('cli-complemento', d.complemento);
+      document.getElementById('cli-form-title').textContent = 'Editar cliente: '+c.nombre;
+      document.getElementById('cli-save').textContent = 'Guardar cambios';
+      document.getElementById('cli-cancel').style.display = '';
+      renderClientes();
+      document.getElementById('cli-nombre').focus();
+    }).catch(alertaError);
+  }
+
+  function limpiarFormCliente(){
+    clienteEditando = null;
+    CLI_INPUTS.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    var tipo = document.getElementById('cli-tipo'); if(tipo){ tipo.value = 'CONSUMIDOR'; toggleCamposContribuyente(); }
+    llenarSelectsCliente();
+    var t=document.getElementById('cli-form-title'); if(t) t.textContent='Nuevo cliente';
+    var b=document.getElementById('cli-save'); if(b) b.textContent='+ Guardar cliente';
+    var x=document.getElementById('cli-cancel'); if(x) x.style.display='none';
+    renderClientes();
+  }
+
+  /** Reemplaza el cliente en las listas en memoria (tabla y selector de Nueva venta) sin recargar todo. */
+  function reemplazarCliente(c){
+    function rep(lista){ for(var i=0;i<lista.length;i++){ if(lista[i].id===c.id){ lista[i] = c; return true; } } return false; }
+    rep(clientes);
+    if(!rep(clientesVenta)) cargarClientesVenta();
+    renderClientes();
+    renderClientForm();
+  }
+
+  function guardarCliente(){
     function v(id){ return document.getElementById(id).value.trim(); }
     var tipo = v('cli-tipo');
     var datos = {
@@ -311,7 +379,13 @@
     // Dirección: los tres códigos salen de los selects del catálogo MH
     var dir = { departamento: v('cli-depto'), municipio: v('cli-municipio'), distrito: v('cli-distrito'), complemento: v('cli-complemento') };
     var algo = dir.departamento || dir.municipio || dir.distrito || dir.complemento;
-    if(algo || tipo==='CONTRIBUYENTE'){
+    var ed = clienteEditando;
+    // Cliente anterior a P2 (dirección solo texto, sin códigos): si no se tocó, no se manda y la API la conserva
+    var dirLegada = ed && ed.direccion && !ed.direccion.departamento &&
+      !dir.departamento && dir.complemento === (ed.direccion.complemento || '');
+    if(dirLegada){
+      delete datos.direccion;
+    } else if(algo || tipo==='CONTRIBUYENTE'){
       if(!dir.departamento || !dir.municipio || !dir.distrito || !dir.complemento){
         toast('Completa la dirección: departamento, municipio, distrito y complemento','warn'); return;
       }
@@ -325,18 +399,30 @@
       if(!datos.nit || !datos.nrc || !datos.codActividad || !datos.descActividad){
         toast('Un contribuyente requiere NIT, NRC y actividad económica','warn'); return;
       }
-    } else if(v('cli-tipodoc')){
-      datos.tipoDocumento = v('cli-tipodoc'); datos.numDocumento = v('cli-numdoc') || null;
-      if(!datos.numDocumento){ toast('Ingresa el número de documento','warn'); return; }
+    } else {
+      if(v('cli-tipodoc')){
+        datos.tipoDocumento = v('cli-tipodoc'); datos.numDocumento = v('cli-numdoc') || null;
+        if(!datos.numDocumento){ toast('Ingresa el número de documento','warn'); return; }
+      }
+      // Al editar un consumidor, NRC/actividad no están en el formulario: no se mandan y la API conserva los actuales
+      if(ed && ed.tipo==='CONSUMIDOR'){ delete datos.nrc; delete datos.codActividad; delete datos.descActividad; }
     }
     var btn = document.getElementById('cli-save'); btn.disabled = true;
-    api.clientes.crear(datos).then(function(c){
-      toast('Cliente "'+c.nombre+'" guardado');
-      ['cli-nombre','cli-comercial','cli-numdoc','cli-nit','cli-nrc','cli-codact','cli-descact','cli-telefono','cli-correo','cli-complemento']
-        .forEach(function(id){ document.getElementById(id).value=''; });
-      llenarSelectsCliente();
-      buscarClientes(); cargarClientesVenta();
-    }).catch(alertaError).then(function(){ btn.disabled = false; });
+    var op = ed ? api.clientes.actualizar(ed.id, datos) : api.clientes.crear(datos);
+    op.then(function(c){
+      if(ed){
+        toast('Cliente "'+c.nombre+'" actualizado');
+        limpiarFormCliente();
+        reemplazarCliente(c);   // solo la fila editada y el selector de venta, sin recargar
+      } else {
+        toast('Cliente "'+c.nombre+'" guardado');
+        limpiarFormCliente();
+        buscarClientes(); cargarClientesVenta();
+      }
+    }).catch(function(e){
+      // VALIDACION (400) trae el campo en el mensaje de la API, p. ej. "nit debe tener 9 o 14 dígitos"
+      toast((ed ? 'No se pudo actualizar: ' : 'No se pudo guardar: ')+((e && (e.mensaje||e.message)) || 'Error inesperado'),'warn');
+    }).then(function(){ btn.disabled = false; });
   }
 
   /* catálogo dropdown */
@@ -495,6 +581,7 @@
     api.dte.emitir(selectedDte, payload, simular).then(function(emision){
       // limpiar la venta y refrescar stock
       cart = []; ventaClienteId = null; renderClientForm(); renderCart();
+      cerrarBorradorEmitido(emision.estado); // Fase 6
       cargarProductos();
       // el detalle trae jsonDte (totalLetras); si falla, se muestra lo que hay
       return api.dte.obtener(emision.id).then(function(det){ return {emision:emision, detalle:det}; },
@@ -614,7 +701,7 @@
   function accionesDte(d){
     var b = [];
     if(d.tipoDte==='03' && d.estado==='PROCESADO') b.push('<button class="btn-mini" onclick="abrirNotaCredito('+d.id+')">Nota de crédito</button>');
-    if(d.estado==='PROCESADO') b.push('<button class="btn-mini danger" onclick="abrirAnular('+d.id+')">Anular</button>');
+    if(d.estado==='PROCESADO' && puedeInvalidar()) b.push('<button class="btn-mini danger" onclick="abrirAnular('+d.id+')">Anular</button>');
     if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="consultarMhDte('+d.id+')" title="¿MH sí lo recibió?">Consultar MH</button>');
     if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="reintentarDte('+d.id+')">Reintentar envío</button>');
     return b.join('');
@@ -676,7 +763,11 @@
 
   /* --- Anular (invalidación) --- */
   var anularId = null;
+  /** Misma política que la API (backend/src/config/politicas.js · ROLES_INVALIDAR); la API es la que manda (403). */
+  var ROLES_INVALIDAR = ['ADMIN'];
+  function puedeInvalidar(){ return !!usuarioActual && ROLES_INVALIDAR.indexOf(usuarioActual.rol)!==-1; }
   function abrirAnular(id){
+    if(!puedeInvalidar()){ toast('Tu rol no permite anular documentos','warn'); return; }
     var d = dtes.filter(function(x){return x.id===id})[0] || (ultimaEmision && ultimaEmision.emision.id===id ? ultimaEmision.emision : null);
     anularId = id;
     document.getElementById('an-doc').textContent = d ? d.numeroControl : ('DTE #'+id);
@@ -1151,15 +1242,27 @@
     emailTargetId = id || null;
     document.getElementById('email-dte').textContent = dte;
     document.getElementById('email-input').value = '';
+    document.getElementById('email-send').disabled = false;
     document.getElementById('email-modal').classList.add('show');
     setTimeout(function(){ document.getElementById('email-input').focus(); }, 50);
+    // Fase 6: propone el correo del receptor del DTE
+    if(emailTargetId) api.dte.obtener(emailTargetId).then(function(d){
+      var c = d.jsonDte && d.jsonDte.receptor && d.jsonDte.receptor.correo;
+      var inp = document.getElementById('email-input');
+      if(c && !inp.value && emailTargetId===d.id) inp.value = c;
+    }, function(){});
   }
   function closeEmailModal(){ document.getElementById('email-modal').classList.remove('show'); }
+  /* Fase 6: el envío es SIMULADO (POST /api/dte/:id/correo solo registra en bitácora); nunca se informa "enviado". */
   function sendEmail(){
     var v = document.getElementById('email-input').value.trim();
     if(!v || v.indexOf('@')===-1 || v.indexOf('.')===-1){ toast('Ingresa un correo válido','warn'); return; }
-    closeEmailModal();
-    toast('DTE '+emailTargetDte+' enviado a '+v);
+    if(!emailTargetId){ toast('No hay un DTE seleccionado','warn'); return; }
+    var btn = document.getElementById('email-send'); btn.disabled = true;
+    api.dte.correo(emailTargetId, v).then(function(r){
+      closeEmailModal();
+      toast('Envío simulado registrado: NO se envió ningún correo a '+r.correo+' (no hay servidor SMTP).', 'info');
+    }).catch(alertaError).then(function(){ btn.disabled = false; });
   }
 
   function buildPrintHtml(){
@@ -1226,9 +1329,319 @@
   }
 
   renderInventory(); renderCart(); renderCatalog(''); renderClientForm(); renderClientes();
-  // F2: restaurar la sesión guardada (el token se valida en la primera llamada a la API)
-  if(api.isLoggedIn() && api.getUsuario()) iniciarSesion(api.getUsuario());
+  // Fase 3: la sesión vive en una cookie HttpOnly; al recargar se pregunta al backend quién es el usuario
+  api.sesion().then(function(u){ if(!usuarioActual) iniciarSesion(u); }).catch(function(){ /* sin sesión: queda el login */ });
+  // Credenciales de prueba solo si el backend lo indica (entorno académico local)
+  api.health().then(function(h){
+    var el = document.getElementById('login-demo');
+    if(!el || !h || !h.demo || !h.demo.credenciales) return;
+    el.innerHTML = 'Usuarios de prueba: ' + h.demo.credenciales.map(function(c){ return '<b>'+_h(c.usuario)+'</b> / '+_h(c.password); }).join(' · ');
+    el.style.display = '';
+  }).catch(function(){ /* sin health: no se muestran */ });
   renderHistorial(); renderBitacora();
+
+  /* ===== Fase 6: borradores de venta (GET/POST/PUT/DELETE /api/borradores) ===== */
+  var borradores = [];
+  var borradorActualId = null;   // borrador que se está continuando en Nueva venta
+
+  function payloadBorrador(){
+    return { tipoDte: selectedDte, clienteId: ventaClienteId,
+             items: cart.map(function(c){ return { productoId:c.id, cantidad:c.qty }; }) };
+  }
+  function renderBorradorInfo(){
+    var info = document.getElementById('v-borrador-info'), btn = document.getElementById('v-borrador-btn');
+    if(!info || !btn) return;
+    btn.textContent = borradorActualId ? 'Actualizar borrador #'+borradorActualId : 'Guardar borrador';
+    info.style.display = borradorActualId ? 'block' : 'none';
+    info.innerHTML = borradorActualId ? 'Continuando el borrador #'+borradorActualId+' · <a href="#" class="link" onclick="soltarBorrador();return false">guardar como uno nuevo</a>' : '';
+  }
+  function soltarBorrador(){ borradorActualId = null; renderBorradorInfo(); }
+  function guardarBorrador(){
+    if(cart.length===0){ toast('Agrega al menos un producto para guardar el borrador','warn'); return; }
+    var btn = document.getElementById('v-borrador-btn'); btn.disabled = true;
+    var nuevo = !borradorActualId;
+    var p = nuevo ? api.borradores.crear(payloadBorrador()) : api.borradores.actualizar(borradorActualId, payloadBorrador());
+    p.then(function(b){
+      borradorActualId = b.id;
+      toast('Borrador #'+b.id+(nuevo?' guardado':' actualizado')+' (total estimado '+money(b.totalEstimado)+')');
+    }, alertaError).then(function(){ btn.disabled = false; renderBorradorInfo(); });
+  }
+  function cargarBorradores(){
+    return api.borradores.listar().then(function(l){ borradores = l; renderBorradores(); }).catch(alertaError);
+  }
+  function renderBorradores(){
+    var tb = document.getElementById('bo-tbody'); if(!tb) return;
+    var c = document.getElementById('bo-count'); if(c) c.textContent = borradores.length ? borradores.length+' sin emitir' : '';
+    if(!borradores.length){
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:26px"><div class="ic">📄</div>No tienes borradores. Usa "Guardar borrador" en Nueva venta.</div></td></tr>';
+      return;
+    }
+    tb.innerHTML = borradores.map(function(b){
+      var faltan = b.items.filter(function(i){ return !i.disponible; }).length;
+      return '<tr><td>#'+b.id+'</td><td>'+(TIPO_DTE[b.tipoDte]||b.tipoDte)+'</td>'+
+        '<td>'+(b.cliente ? _h(b.cliente.nombre) : '<span class="muted">'+(b.tipoDte==='03'?'Sin contribuyente':'Consumidor final')+'</span>')+'</td>'+
+        '<td class="num">'+b.items.length+(faltan?' <span class="st st-rejected" title="Productos inactivos o eliminados">'+faltan+' no disp.</span>':'')+'</td>'+
+        '<td class="num">'+money(b.totalEstimado)+'</td><td>'+fmtFechaHora(b.actualizadoEn)+'</td>'+
+        '<td class="num"><div class="row-actions" style="justify-content:flex-end"><button class="link" onclick="continuarBorrador('+b.id+')">Continuar</button>'+
+        '<button class="icon-btn del" title="Eliminar borrador" onclick="eliminarBorrador('+b.id+')">🗑️</button></div></td></tr>';
+    }).join('');
+  }
+  /** Carga el borrador en Nueva venta con el stock y los clientes vigentes (avisa lo que cambió). */
+  function continuarBorrador(id){
+    if(cart.length && borradorActualId!==id && !confirm('La venta en curso se reemplazará por el borrador #'+id+'. ¿Continuar?')) return;
+    Promise.all([api.borradores.obtener(id), cargarProductos(), cargarClientesVenta()]).then(function(r){
+      var b = r[0], avisos = [];
+      pickDte(b.tipoDte);
+      ventaClienteId = (b.clienteId && clientePorId(b.clienteId)) ? b.clienteId : null;
+      if(b.clienteId && !ventaClienteId) avisos.push('el cliente ya no está activo');
+      cart = [];
+      b.items.forEach(function(i){
+        var p = prodPorId(i.productoId);
+        if(!p){ avisos.push((i.codigo||('producto '+i.productoId))+' ya no está disponible'); return; }
+        var qty = Math.min(i.cantidad, p.stock);
+        if(qty < i.cantidad) avisos.push(p.codigo+': solo hay '+p.stock+' en stock');
+        if(qty > 0) cart.push({ id:p.id, qty:qty });
+      });
+      borradorActualId = b.id;
+      renderClientForm(); renderCart(); renderBorradorInfo();
+      setPanelById('vendedor','v-venta');
+      if(avisos.length) toast('Borrador #'+b.id+' cargado con cambios: '+avisos.join('; '), 'warn');
+      else toast('Borrador #'+b.id+' cargado');
+    }).catch(alertaError);
+  }
+  function eliminarBorrador(id){
+    if(!confirm('¿Eliminar el borrador #'+id+'?')) return;
+    api.borradores.eliminar(id).then(function(){
+      if(borradorActualId===id){ borradorActualId = null; renderBorradorInfo(); }
+      toast('Borrador #'+id+' eliminado');
+      return cargarBorradores();
+    }).catch(alertaError);
+  }
+  /** Tras emitir: si MH no lo rechazó, el borrador ya es un DTE y se elimina. */
+  function cerrarBorradorEmitido(estado){
+    var id = borradorActualId; if(!id) return;
+    borradorActualId = null; renderBorradorInfo();
+    if(estado==='RECHAZADO'){ toast('MH rechazó la venta: el borrador #'+id+' se conserva en Borradores','warn'); return; }
+    api.borradores.eliminar(id).catch(function(){ /* si falla, queda en la lista y se puede borrar a mano */ });
+  }
+
+  /* ===== Fase 6: utilidades de exportación CSV (generado en el navegador con los datos cargados) ===== */
+  function descargarCsv(nombre, filas){
+    function cel(v){ v = v==null ? '' : String(v); return /[",;\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+    var csv = '﻿' + filas.map(function(f){ return f.map(cel).join(','); }).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  /* ===== Fase 6: panel gerencial (GET /api/reportes/resumen + GET /api/dte del período) ===== */
+  var gResumen = null, gVentas = [];
+  var COLOR_TIPO = { '01':'var(--blue)', '03':'#bcd6ee', '05':'#e8a35c' };
+  function setTxt(id, v){ var el = document.getElementById(id); if(el) el.textContent = v; }
+  /** Mes elegido (por defecto el actual) → { desde, hasta, tipo } */
+  function periodoGerente(){
+    var mesEl = document.getElementById('g-mes');
+    if(!mesEl.value) mesEl.value = ymd(new Date()).slice(0,7);
+    var p = mesEl.value.split('-');
+    var fin = new Date(parseInt(p[0],10), parseInt(p[1],10), 0); // último día del mes
+    return { desde: mesEl.value+'-01', hasta: ymd(fin), tipo: document.getElementById('g-tipo').value || undefined };
+  }
+  function cargarGerente(){
+    if(!esAdmin()) return Promise.resolve();
+    var f = periodoGerente();
+    contarContingencia();
+    return Promise.all([api.reportes.resumen(f), api.dte.listar(f)]).then(function(r){
+      gResumen = r[0]; gVentas = r[1]; renderGerente();
+    }).catch(alertaError);
+  }
+  function renderGerente(){
+    var r = gResumen; if(!r) return;
+    var t = r.totales, e = r.porEstado;
+    setTxt('g-periodo', 'Período: '+fmtFecha(r.periodo.desde)+' – '+fmtFecha(r.periodo.hasta)+(r.periodo.tipo?' · '+TIPO_DTE[r.periodo.tipo]:'')+
+      '. Suman los DTE procesados y en contingencia; los rechazados y anulados no suman.');
+    setTxt('kpi-netas', money(t.ventasNetas));
+    setTxt('kpi-netas-sub', 'Brutas '+money(t.ventasBrutas)+' − NC '+money(t.notasCredito));
+    setTxt('kpi-docs', String(t.documentos));
+    setTxt('kpi-docs-sub', 'Rechazados '+e.RECHAZADO+' · Anulados '+e.INVALIDADO);
+    setTxt('kpi-ticket', money(t.ticketPromedio));
+    // barras por día
+    var bars = document.getElementById('g-bars');
+    var max = Math.max.apply(null, r.porDia.map(function(d){ return d.total; }).concat([0]));
+    if(max===0){
+      bars.innerHTML = '<div class="empty" style="width:100%;align-self:center"><div class="ic">📊</div>Sin ventas en el período</div>';
+    } else {
+      bars.innerHTML = r.porDia.map(function(d){
+        var h = d.total>0 ? Math.max(d.total/max*100, 2) : 0;
+        var dia = parseInt(d.fecha.slice(8),10);
+        var lbl = (r.porDia.length<=10 || dia===1 || dia%5===0) ? dia : '';
+        return '<div class="bar-col" title="'+fmtFecha(d.fecha)+': '+money(d.total)+' ('+d.documentos+' doc.)"><div class="bar" style="height:'+h.toFixed(1)+'%"></div><span class="lbl">'+lbl+'</span></div>';
+      }).join('');
+    }
+    // dona por tipo (montos vigentes)
+    var suma = r.porTipo.reduce(function(a, x){ return a + x.total; }, 0), acum = 0;
+    var segs = r.porTipo.filter(function(x){ return x.total>0; }).map(function(x){
+      var ini = acum; acum += x.total/suma*100;
+      return COLOR_TIPO[x.tipoDte]+' '+ini.toFixed(2)+'% '+acum.toFixed(2)+'%';
+    });
+    document.getElementById('g-donut').style.background = segs.length ? 'conic-gradient('+segs.join(',')+')' : 'var(--border)';
+    document.getElementById('g-legend').innerHTML = r.porTipo.map(function(x){
+      var pct = suma ? Math.round(x.total/suma*100) : 0;
+      return '<div class="li"><span class="sw" style="background:'+COLOR_TIPO[x.tipoDte]+'"></span> '+TIPO_DTE[x.tipoDte]+' — '+pct+'% · '+money(x.total)+' ('+x.documentos+')</div>';
+    }).join('');
+    // transacciones del período
+    setTxt('gv-count', gVentas.length+' documentos');
+    document.getElementById('gv-tbody').innerHTML = gVentas.length ? gVentas.map(function(d){
+      return '<tr><td><a href="#" class="link" onclick="verDte('+d.id+');return false">'+_h(d.numeroControl)+'</a></td><td>'+fmtFechaHora(d.fechaEmision)+'</td>'+
+        '<td>'+_h(d.usuario||'—')+'</td><td>'+_h(d.receptor)+'</td><td>'+(TIPO_DTE[d.tipoDte]||d.tipoDte)+'</td>'+
+        '<td class="num">'+money(d.total)+'</td><td>'+estadoBadge(d.estado)+'</td></tr>';
+    }).join('') : '<tr><td colspan="7"><div class="empty" style="padding:26px">Sin documentos en el período</div></td></tr>';
+    // ventas por vendedor
+    document.getElementById('gr-vend-tbody').innerHTML = r.porVendedor.length ? r.porVendedor.map(function(v){
+      return '<tr><td>'+_h(v.nombre)+' <span class="muted small">('+_h(v.usuario)+')</span></td><td class="num">'+v.documentos+'</td>'+
+        '<td class="num">'+money(v.total)+'</td><td class="num">'+money(v.notasCredito)+'</td></tr>';
+    }).join('') : '<tr><td colspan="4" class="muted">Sin ventas en el período</td></tr>';
+  }
+  function exportarVentasCsv(){
+    if(!gVentas.length){ toast('No hay documentos en el período para exportar','warn'); return; }
+    var cols = ['id','numeroControl','fechaEmision','usuario','receptor','tipoDte','estado','total','codigoGeneracion','selloRecibido'];
+    descargarCsv('ventas-'+document.getElementById('g-mes').value+'.csv',
+      [cols].concat(gVentas.map(function(d){ return cols.map(function(c){ return d[c]; }); })));
+    toast('CSV descargado ('+gVentas.length+' documentos)');
+  }
+  function exportarResumenCsv(){
+    var r = gResumen;
+    if(!r){ toast('El reporte aún no se ha cargado','warn'); return; }
+    var t = r.totales, filas = [
+      ['Reporte de ventas', 'desde', r.periodo.desde, 'hasta', r.periodo.hasta, 'tipo', r.periodo.tipo || 'todos'],
+      [],
+      ['ventasBrutas','notasCredito','ventasNetas','iva','documentos','ticketPromedio'],
+      [t.ventasBrutas, t.notasCredito, t.ventasNetas, t.iva, t.documentos, t.ticketPromedio],
+      [],
+      ['estado','documentos']
+    ].concat(Object.keys(r.porEstado).map(function(k){ return [k, r.porEstado[k]]; }),
+      [[], ['tipoDte','documentos','total']], r.porTipo.map(function(x){ return [x.tipoDte, x.documentos, x.total]; }),
+      [[], ['usuario','nombre','documentos','total','notasCredito']], r.porVendedor.map(function(v){ return [v.usuario, v.nombre, v.documentos, v.total, v.notasCredito]; }),
+      [[], ['fecha','documentos','total']], r.porDia.map(function(d){ return [d.fecha, d.documentos, d.total]; }));
+    descargarCsv('reporte-ventas-'+r.periodo.desde.slice(0,7)+'.csv', filas);
+    toast('Reporte CSV descargado');
+  }
+
+  /* ===== Fase 6: administración de usuarios (GET/POST/PUT /api/usuarios) ===== */
+  var usuariosLista = [], usuarioEditando = null;
+  var ROL_UI = { ADMIN:'Administrador', VENDEDOR:'Vendedor' };
+  var ACCION_UI = { EMISION:'Emisión DTE', REINTENTO:'Reintento', INVALIDACION:'Invalidación', CONTINGENCIA:'Evento de contingencia',
+    LOGIN:'Inicio de sesión', LOGIN_FALLIDO:'Login fallido', CREAR:'Crear', ACTUALIZAR:'Actualizar', ELIMINAR:'Eliminar',
+    CORREO_SIMULADO:'Correo (simulado)', CONSULTA_MH:'Consulta a MH' };
+  function cargarUsuarios(){
+    if(!esAdmin()) return Promise.resolve();
+    var inc = document.getElementById('u-inactivos').checked;
+    return Promise.all([api.usuarios.listar({ incluirInactivos: inc ? 1 : undefined }), api.bitacora({ limite: 6 })]).then(function(r){
+      usuariosLista = r[0]; renderUsuarios(); renderActividad(r[1]);
+    }).catch(alertaError);
+  }
+  function renderUsuarios(){
+    var tb = document.getElementById('u-tbody'); if(!tb) return;
+    if(!usuariosLista.length){ tb.innerHTML = '<tr><td colspan="4" class="muted">Sin usuarios</td></tr>'; return; }
+    tb.innerHTML = usuariosLista.map(function(u){
+      var yo = usuarioActual && u.id===usuarioActual.id;
+      return '<tr><td><div class="u-cell"><span class="avatar">'+_h(iniciales(u.nombre))+'</span><div>'+_h(u.nombre)+(yo?' <span class="muted small">(tú)</span>':'')+
+        '<div class="muted small">'+_h(u.usuario)+'</div></div></div></td>'+
+        '<td>'+(ROL_UI[u.rol]||_h(u.rol))+'</td><td>'+(u.activo?'<span class="st st-active">Activo</span>':'<span class="st st-inactive">Inactivo</span>')+'</td>'+
+        '<td class="num"><div class="row-actions" style="justify-content:flex-end"><button class="icon-btn" title="Editar" onclick="editarUsuario('+u.id+')">✏️</button>'+
+        (yo ? '' : '<button class="icon-btn'+(u.activo?' del':'')+'" title="'+(u.activo?'Desactivar':'Activar')+'" onclick="cambiarActivoUsuario('+u.id+','+(!u.activo)+')">'+(u.activo?'🚫':'✅')+'</button>')+
+        '</div></td></tr>';
+    }).join('');
+  }
+  function renderActividad(lista){
+    var box = document.getElementById('u-log'); if(!box) return;
+    box.innerHTML = (lista.length ? lista.map(function(b){
+      return '<div class="log-item"><span class="dot"></span><div><div class="t">'+_h(ACCION_UI[b.accion]||b.accion)+
+        (b.entidad?' · '+_h(b.entidad)+(b.entidadId?' #'+b.entidadId:''):'')+(b.usuario?' — '+_h(b.usuario):'')+'</div>'+
+        '<div class="ts">'+fmtFechaHora(b.fecha)+'</div></div></div>';
+    }).join('') : '<p class="muted small">Sin actividad registrada</p>') +
+      '<a href="#" class="link small" onclick="setPanelById(\'admin\',\'a-bitacora\');return false">Ver bitácora completa →</a>';
+  }
+  function limpiarFormUsuario(){
+    usuarioEditando = null;
+    ['u-usuario','u-nombre','u-password'].forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
+    var us = document.getElementById('u-usuario'); if(!us) return;
+    us.disabled = false;
+    var rol = document.getElementById('u-rol'); rol.value = 'VENDEDOR'; rol.disabled = false;
+    setTxt('u-form-title', 'Nuevo usuario');
+    document.getElementById('u-pass-label').innerHTML = 'Contraseña <span class="req">*</span>';
+    setTxt('u-save', '+ Crear usuario');
+    document.getElementById('u-cancel').style.display = 'none';
+  }
+  function nuevoUsuario(){
+    setPanelById('admin','a-usuarios'); limpiarFormUsuario();
+    document.getElementById('u-usuario').focus();
+  }
+  function editarUsuario(id){
+    api.usuarios.obtener(id).then(function(u){
+      usuarioEditando = u;
+      var yo = usuarioActual && u.id===usuarioActual.id;
+      document.getElementById('u-usuario').value = u.usuario; document.getElementById('u-usuario').disabled = true;
+      document.getElementById('u-nombre').value = u.nombre;
+      var rol = document.getElementById('u-rol'); rol.value = u.rol; rol.disabled = yo; // nadie se quita el rol ADMIN a sí mismo
+      document.getElementById('u-password').value = '';
+      setTxt('u-form-title', 'Editar usuario '+u.usuario);
+      document.getElementById('u-pass-label').textContent = 'Nueva contraseña (opcional)';
+      setTxt('u-save', 'Guardar cambios');
+      document.getElementById('u-cancel').style.display = '';
+      document.getElementById('u-nombre').focus();
+    }).catch(alertaError);
+  }
+  function guardarUsuario(){
+    var editando = usuarioEditando;
+    var datos = { nombre: document.getElementById('u-nombre').value.trim(), rol: document.getElementById('u-rol').value };
+    var pass = document.getElementById('u-password').value;
+    if(!datos.nombre){ toast('El nombre es obligatorio','warn'); return; }
+    if((!editando || pass) && pass.length < 8){ toast('La contraseña debe tener al menos 8 caracteres','warn'); return; }
+    if(pass) datos.password = pass;
+    if(!editando){
+      datos.usuario = document.getElementById('u-usuario').value.trim();
+      if(!datos.usuario){ toast('El usuario (login) es obligatorio','warn'); return; }
+    }
+    var btn = document.getElementById('u-save'); btn.disabled = true;
+    (editando ? api.usuarios.actualizar(editando.id, datos) : api.usuarios.crear(datos)).then(function(u){
+      if(usuarioActual && u.id===usuarioActual.id){ usuarioActual.nombre = u.nombre; var av = document.getElementById('v-avatar'); if(av) av.textContent = iniciales(u.nombre); }
+      toast('Usuario '+u.usuario+(editando?' actualizado':' creado'));
+      limpiarFormUsuario();
+      return cargarUsuarios();
+    }).catch(alertaError).then(function(){ btn.disabled = false; });
+  }
+  function cambiarActivoUsuario(id, activo){
+    var u = usuariosLista.filter(function(x){ return x.id===id; })[0];
+    var nombre = u ? u.usuario : '#'+id;
+    if(!activo && !confirm('¿Desactivar a '+nombre+'? Ya no podrá iniciar sesión (una sesión abierta sigue vigente hasta que venza, máx. 8 h).')) return;
+    api.usuarios.actualizar(id, { activo: activo }).then(function(){
+      toast('Usuario '+nombre+(activo?' activado':' desactivado'));
+      if(usuarioEditando && usuarioEditando.id===id) limpiarFormUsuario();
+      return cargarUsuarios();
+    }).catch(alertaError);
+  }
+
+  /* ===== Fase 6: configuración — emisor real (GET /api/emisor), solo lectura ===== */
+  var TIPO_ESTABLECIMIENTO = { '01':'Sucursal / agencia', '02':'Casa matriz', '04':'Bodega', '07':'Predio y/o patio', '20':'Otro' };
+  function cargarEmisorConfig(){
+    var box = document.getElementById('cfg-emisor'); if(!box) return Promise.resolve();
+    return api.emisor().then(function(e){
+      var dir = e.direccion || {};
+      function fila(k, v){ return '<div class="dr-row"><span>'+k+'</span><b>'+(v ? _h(v) : '<span class="muted">—</span>')+'</b></div>'; }
+      box.innerHTML = '<div style="border:1px solid var(--border);border-radius:var(--radius-sm)">'+
+        fila('Nombre o razón social', e.nombre) + fila('Nombre comercial', e.nombreComercial) +
+        fila('NIT', e.nit) + fila('NRC', e.nrc) +
+        fila('Actividad económica', e.codActividad+' · '+e.descActividad) +
+        fila('Tipo de establecimiento', e.tipoEstablecimiento+' · '+(TIPO_ESTABLECIMIENTO[e.tipoEstablecimiento]||'')) +
+        fila('Establec. / punto venta',e.codEstable+' / '+e.codPuntoVenta) +
+        fila('Dirección', [dir.complemento, textoUbicacion(dir)].filter(Boolean).join(', ')) +
+        fila('Teléfono', e.telefono) + fila('Correo', e.correo) +
+        fila('Ambiente MH', '00 · pruebas (Hacienda simulada)') +
+      '</div>';
+    }).catch(function(err){ box.innerHTML = '<p class="muted small">No se pudo cargar el emisor.</p>'; alertaError(err); });
+  }
 
   function toggleSidebar(role){
     var sb = document.getElementById('sb-'+role);
@@ -1245,9 +1658,10 @@
     var t = document.getElementById('toast');
     var icon = document.getElementById('toast-icon');
     if(type==='warn'){ icon.className='tick warn'; icon.textContent='!'; }
+    else if(type==='info'){ icon.className='tick warn'; icon.textContent='i'; }
     else { icon.className='tick'; icon.textContent='✓'; }
     document.getElementById('toast-msg').textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function(){t.classList.remove('show')},2600);
+    toastTimer = setTimeout(function(){t.classList.remove('show')}, type==='info' || msg.length > 80 ? 5000 : 2600);
   }

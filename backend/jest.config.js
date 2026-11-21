@@ -20,6 +20,6 @@ module.exports = {
     },
   ],
   collectCoverageFrom: ['src/**/*.js', '!src/server.js'],
-  coverageReporters: ['text-summary', 'text', 'html'],
+  coverageReporters: ['text-summary', 'text', 'html', 'json-summary'],
   testTimeout: 30000,
 };

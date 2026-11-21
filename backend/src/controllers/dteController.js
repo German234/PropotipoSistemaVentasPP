@@ -4,6 +4,7 @@ const consultaMh = require('../services/consultaMhService');
 const { leerModo } = require('../dte/simuladores/mhRecepcion');
 const { ok } = require('../utils/respuesta');
 const pdfDte = require('../dte/pdf');
+const correo = require('../services/correoService');
 const v = require('../utils/validar');
 
 /** El modo de MH (ok | rechazo | contingencia) sale del header X-Simular. */
@@ -49,4 +50,8 @@ const pdf = async (req, res) => {
 const consultar = async (req, res) =>
   ok(res, await consultaMh.consultar(v.id(req.params.id), req.usuario, leerModo(req)));
 
-module.exports = { emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, consultar, invalidar, listar, obtener, pdf };
+/** POST /api/dte/:id/correo — envío SIMULADO (Fase 6): solo bitácora, no sale ningún correo */
+const enviarCorreo = async (req, res) =>
+  ok(res, await correo.enviarSimulado(v.id(req.params.id), req.body || {}, req.usuario));
+
+module.exports = { enviarCorreo, emitir01: emitir('01'), emitir03: emitir('03'), emitir05, reintentar, consultar, invalidar, listar, obtener, pdf };

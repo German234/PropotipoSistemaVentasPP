@@ -30,9 +30,10 @@ async function listar({ tipo, estado, desde, hasta, clienteId } = {}) {
     `SELECT d.id, d.tipo_dte AS tipoDte, d.numero_control AS numeroControl, d.codigo_generacion AS codigoGeneracion,
             d.sello_recibido AS selloRecibido, d.estado, d.fecha_emision AS fechaEmision,
             ISNULL(c.nombre, 'Consumidor final') AS receptor, d.cliente_id AS clienteId, d.total,
-            d.dte_relacionado_id AS dteRelacionadoId
+            d.dte_relacionado_id AS dteRelacionadoId, u.usuario
      FROM dbo.dte d
      LEFT JOIN dbo.clientes c ON c.id = d.cliente_id
+     JOIN dbo.usuarios u ON u.id = d.usuario_id
      WHERE d.estado <> 'BORRADOR'
        AND (@tipo IS NULL OR d.tipo_dte = @tipo)
        AND (@estado IS NULL OR d.estado = @estado)

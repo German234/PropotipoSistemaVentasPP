@@ -235,3 +235,62 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_bitacora_fecha')
     CREATE INDEX ix_bitacora_fecha ON dbo.bitacora (fecha DESC);
 GO
+
+/* ---------- Fase 5: tareas programadas de contingencia (configuración persistente y registro de ejecuciones)
+   LOTE_CONTINGENCIA = lote automático del cierre del día (hora HH:mm) · CONSULTA_MH = cola de consultas a MH
+   (intervalo en segundos). La fila se crea en el primer arranque con los valores de backend/.env; después
+   manda la BD (sobrevive a reinicios). en_curso_* = candado de ejecución: evita que dos procesos (o un turno que
+   se solapa con otro) ejecuten la misma tarea a la vez; vence solo si el proceso murió a mitad. ---------- */
+IF OBJECT_ID('dbo.config_tarea', 'U') IS NULL
+CREATE TABLE dbo.config_tarea (
+    tarea                 VARCHAR(30)   NOT NULL PRIMARY KEY
+        CONSTRAINT ck_config_tarea_tarea CHECK (tarea IN ('LOTE_CONTINGENCIA', 'CONSULTA_MH')),
+    activo                BIT           NOT NULL,
+    hora                  CHAR(5)       NULL                     -- LOTE_CONTINGENCIA: HH:mm
+        CONSTRAINT ck_config_tarea_hora CHECK (hora IS NULL OR hora LIKE '[0-2][0-9]:[0-5][0-9]'),
+    intervalo_seg         INT           NULL                     -- CONSULTA_MH: 10..3600
+        CONSTRAINT ck_config_tarea_intervalo CHECK (intervalo_seg IS NULL OR intervalo_seg BETWEEN 10 AND 3600),
+    en_curso_desde        DATETIME2(3)  NULL,
+    en_curso_por          VARCHAR(100)  NULL,                    -- host:pid:aleatorio del proceso que la ejecuta
+    ultima_ejecucion_dia  DATE          NULL,                    -- LOTE_CONTINGENCIA: día del último lote del temporizador
+    actualizado_por       INT           NULL REFERENCES dbo.usuarios(id),
+    actualizado_en        DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+
+/* Registro de cada ejecución de las tareas (resultado, duración y error si lo hubo). */
+IF OBJECT_ID('dbo.ejecucion_tarea', 'U') IS NULL
+CREATE TABLE dbo.ejecucion_tarea (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    tarea       VARCHAR(30)   NOT NULL,
+    disparo     VARCHAR(15)   NOT NULL,                     -- TEMPORIZADOR | DIRECTO
+    proceso     VARCHAR(100)  NOT NULL,
+    inicio      DATETIME2(3)  NOT NULL,
+    fin         DATETIME2(3)  NOT NULL,
+    resultado   VARCHAR(20)   NOT NULL,                     -- PROCESADO, RECHAZADO, SIN_PENDIENTES, SIN_RESPUESTA,
+                                                            -- ENCONTRADO, NO_ENCONTRADO, OMITIDA, ERROR
+    mensaje     NVARCHAR(500) NULL,
+    detalle     NVARCHAR(MAX) NULL,                         -- JSON (eventoId, codigoLote, dteId, ...)
+    error       NVARCHAR(MAX) NULL                          -- solo en el log del servidor y aquí, nunca en respuestas 500
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ejecucion_tarea')
+    CREATE INDEX ix_ejecucion_tarea ON dbo.ejecucion_tarea (tarea, id DESC);
+GO
+
+/* ---------- Fase 6: borradores de venta (carrito sin emitir, por usuario) ----------
+   items = JSON [{productoId, cantidad}]. No reservan stock ni consumen correlativo. */
+IF OBJECT_ID('dbo.borrador', 'U') IS NULL
+CREATE TABLE dbo.borrador (
+    id              INT IDENTITY(1,1) PRIMARY KEY,
+    usuario_id      INT           NOT NULL REFERENCES dbo.usuarios(id),
+    tipo_dte        CHAR(2)       NOT NULL CONSTRAINT ck_borrador_tipo CHECK (tipo_dte IN ('01','03')),
+    cliente_id      INT           NULL REFERENCES dbo.clientes(id),
+    items           NVARCHAR(MAX) NOT NULL CONSTRAINT ck_borrador_items CHECK (ISJSON(items) = 1),
+    creado_en       DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME(),
+    actualizado_en  DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_borrador_usuario')
+    CREATE INDEX ix_borrador_usuario ON dbo.borrador (usuario_id, actualizado_en DESC);
+GO

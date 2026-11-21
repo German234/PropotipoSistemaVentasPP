@@ -1,0 +1,27 @@
+$ npm run test:e2e   (2026-11-20T20:58:43-06:00, Playwright Version 1.58.0, Edge 157.0.4341.60)
+
+> pos-dte-backend@0.1.0 test:e2e
+> playwright test -c tests/e2e/playwright.config.js
+
+
+Running 16 tests using 1 worker
+
+  ok  1 tests\e2e\01-login.spec.js:5:3 › Inicio de sesión › muestra las credenciales de prueba en el entorno local (1.4s)
+  ok  2 tests\e2e\01-login.spec.js:12:3 › Inicio de sesión › contraseña incorrecta → mensaje claro y sigue en el login (1.4s)
+  ok  3 tests\e2e\01-login.spec.js:22:3 › Inicio de sesión › login correcto, la sesión sobrevive a la recarga y logout la cierra (1.8s)
+  ok  4 tests\e2e\02-roles.spec.js:5:3 › Restricciones por rol › VENDEDOR: no ve opciones de ADMIN en el menú, la venta ni el inventario (1.7s)
+  ok  5 tests\e2e\02-roles.spec.js:19:3 › Restricciones por rol › VENDEDOR: emite una factura pero no ve "Anular" en Transacciones (2.3s)
+  ok  6 tests\e2e\02-roles.spec.js:34:3 › Restricciones por rol › VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia) (1.4s)
+  ok  7 tests\e2e\02-roles.spec.js:51:3 › Restricciones por rol › ADMIN: ve Contingencia, Administración, Simular MH y "Anular" (1.5s)
+  ok  8 tests\e2e\03-clientes.spec.js:12:3 › Clientes › registro de consumidor final con DUI (2.2s)
+  ok  9 tests\e2e\03-clientes.spec.js:22:3 › Clientes › registro de contribuyente con dirección del catálogo MH, edición y rechazo de datos inválidos (3.6s)
+  ok 10 tests\e2e\04-venta-dte.spec.js:8:3 › Venta y emisión de DTE › Factura 01 a consumidor final: PROCESADO con sello, JSON y descuento de stock (1.9s)
+  ok 11 tests\e2e\04-venta-dte.spec.js:23:3 › Venta y emisión de DTE › CCF 03 a un contribuyente: IVA desglosado y tributo 20 (2.2s)
+  ok 12 tests\e2e\04-venta-dte.spec.js:45:3 › Venta y emisión de DTE › CCF 03 sin cliente contribuyente → aviso y no emite (1.6s)
+  ok 13 tests\e2e\05-invalidacion-pdf.spec.js:10:3 › Invalidación y PDF › ADMIN anula una factura desde Transacciones: INVALIDADO, stock devuelto y bitácora (2.7s)
+  ok 14 tests\e2e\05-invalidacion-pdf.spec.js:40:3 › Invalidación y PDF › Descargar el PDF real del DTE desde Transacciones (7.1s)
+  ok 15 tests\e2e\06-contingencia.spec.js:5:3 › Contingencia › MH no responde → DTE en CONTINGENCIA → lote manual → PROCESADO con sello (2.7s)
+  ok 16 tests\e2e\06-contingencia.spec.js:35:3 › Contingencia › VENDEDOR: el DTE en contingencia se puede reintentar desde Transacciones (3.2s)
+
+  16 passed (45.2s)
+exit=0

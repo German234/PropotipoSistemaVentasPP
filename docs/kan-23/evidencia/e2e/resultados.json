@@ -1,0 +1,928 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\santo\\OneDrive\\Documentos\\UCA\\PropotipoSistemaVentasPP\\backend\\tests\\e2e\\playwright.config.js",
+    "rootDir": "C:/Users/santo/OneDrive/Documentos/UCA/PropotipoSistemaVentasPP/backend/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "C:\\Users\\santo\\OneDrive\\Documentos\\UCA\\PropotipoSistemaVentasPP\\backend\\tests\\e2e\\globalSetup.js",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/santo/OneDrive/Documentos/UCA/PropotipoSistemaVentasPP/docs/kan-23/evidencia/e2e/artefactos",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "C:/Users/santo/OneDrive/Documentos/UCA/PropotipoSistemaVentasPP/backend/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "*.spec.js"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "C:\\Users\\santo\\OneDrive\\Documentos\\UCA\\PropotipoSistemaVentasPP\\docs\\kan-23\\evidencia\\e2e\\html",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "C:\\Users\\santo\\OneDrive\\Documentos\\UCA\\PropotipoSistemaVentasPP\\docs\\kan-23\\evidencia\\e2e\\resultados.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.0",
+    "workers": 1,
+    "webServer": {
+      "command": "node src/server.js",
+      "cwd": "C:\\Users\\santo\\OneDrive\\Documentos\\UCA\\PropotipoSistemaVentasPP\\backend",
+      "url": "http://localhost:3099/api/health",
+      "reuseExistingServer": false,
+      "timeout": 60000,
+      "stdout": "ignore",
+      "stderr": "pipe",
+      "env": {
+        "DB_NAME": "BatallonAtlacatl_Test",
+        "PORT": "3099",
+        "NODE_ENV": "test",
+        "DEMO_CREDENCIALES": "1",
+        "CONTINGENCIA_LOTE_ACTIVO": "0",
+        "CONSULTA_MH_ACTIVO": "0"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "01-login.spec.js",
+      "file": "01-login.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Inicio de sesión",
+          "file": "01-login.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "muestra las credenciales de prueba en el entorno local",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 989,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:04.819Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b4c23474a8d45fc46a9d-9aa2775b5321d286628c",
+              "file": "01-login.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "contraseña incorrecta → mensaje claro y sigue en el login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1185,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:06.082Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b4c23474a8d45fc46a9d-8f563c93dc816d92bb37",
+              "file": "01-login.spec.js",
+              "line": 12,
+              "column": 3
+            },
+            {
+              "title": "login correcto, la sesión sobrevive a la recarga y logout la cierra",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1329,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:07.282Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b4c23474a8d45fc46a9d-04adb54c96018321d0d0",
+              "file": "01-login.spec.js",
+              "line": 22,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "02-roles.spec.js",
+      "file": "02-roles.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Restricciones por rol",
+          "file": "02-roles.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "VENDEDOR: no ve opciones de ADMIN en el menú, la venta ni el inventario",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1322,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:08.625Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6c97daade912e8100ccb-fa44c77c69b7bf2de5e5",
+              "file": "02-roles.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "VENDEDOR: emite una factura pero no ve \"Anular\" en Transacciones",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1522,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:09.956Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6c97daade912e8100ccb-118fef5d5414bea77e26",
+              "file": "02-roles.spec.js",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 974,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:11.489Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6c97daade912e8100ccb-b4bd62a87ef3efd3cd15",
+              "file": "02-roles.spec.js",
+              "line": 34,
+              "column": 3
+            },
+            {
+              "title": "ADMIN: ve Contingencia, Administración, Simular MH y \"Anular\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1161,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:12.471Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6c97daade912e8100ccb-128913ae91daad205117",
+              "file": "02-roles.spec.js",
+              "line": 51,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "03-clientes.spec.js",
+      "file": "03-clientes.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Clientes",
+          "file": "03-clientes.spec.js",
+          "line": 6,
+          "column": 6,
+          "specs": [
+            {
+              "title": "registro de consumidor final con DUI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1299,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:13.645Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "809b8bdbd8c67b0b5ebb-b67bdc9e43358808f4bf",
+              "file": "03-clientes.spec.js",
+              "line": 12,
+              "column": 3
+            },
+            {
+              "title": "registro de contribuyente con dirección del catálogo MH, edición y rechazo de datos inválidos",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2367,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:14.953Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "809b8bdbd8c67b0b5ebb-ef53f0bbb852db94d098",
+              "file": "03-clientes.spec.js",
+              "line": 22,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "04-venta-dte.spec.js",
+      "file": "04-venta-dte.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Venta y emisión de DTE",
+          "file": "04-venta-dte.spec.js",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Factura 01 a consumidor final: PROCESADO con sello, JSON y descuento de stock",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1346,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:17.332Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "674561e03b7c109104d7-9521806da91ef9fc719e",
+              "file": "04-venta-dte.spec.js",
+              "line": 8,
+              "column": 3
+            },
+            {
+              "title": "CCF 03 a un contribuyente: IVA desglosado y tributo 20",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1515,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:18.686Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "674561e03b7c109104d7-254da68303195df49d64",
+              "file": "04-venta-dte.spec.js",
+              "line": 23,
+              "column": 3
+            },
+            {
+              "title": "CCF 03 sin cliente contribuyente → aviso y no emite",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1122,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:20.209Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "674561e03b7c109104d7-b1c12e2fb73e0be7374f",
+              "file": "04-venta-dte.spec.js",
+              "line": 45,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "05-invalidacion-pdf.spec.js",
+      "file": "05-invalidacion-pdf.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Invalidación y PDF",
+          "file": "05-invalidacion-pdf.spec.js",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN anula una factura desde Transacciones: INVALIDADO, stock devuelto y bitácora",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1832,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:21.343Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "246d1da81fed07d0ca43-e91007279642585b0455",
+              "file": "05-invalidacion-pdf.spec.js",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "Descargar el PDF real del DTE desde Transacciones",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6351,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:23.183Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "246d1da81fed07d0ca43-e02a1fc1ed6517745dc8",
+              "file": "05-invalidacion-pdf.spec.js",
+              "line": 40,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "06-contingencia.spec.js",
+      "file": "06-contingencia.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Contingencia",
+          "file": "06-contingencia.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "MH no responde → DTE en CONTINGENCIA → lote manual → PROCESADO con sello",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1853,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:29.550Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e05c18787da0291f7b6d-2d6cdafc99e81310ee1d",
+              "file": "06-contingencia.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "VENDEDOR: el DTE en contingencia se puede reintentar desde Transacciones",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1855,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:31.412Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e05c18787da0291f7b6d-77fca332c6ccec4a7dae",
+              "file": "06-contingencia.spec.js",
+              "line": 35,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "07-fase6.spec.js",
+      "file": "07-fase6.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Fase 6",
+          "file": "07-fase6.spec.js",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Borradores: guardar, listar, continuar y se eliminan al emitir",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2122,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:33.286Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "21534e39b3e9e828143c-105c3092d29b6ee9dd2c",
+              "file": "07-fase6.spec.js",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "Correo: el modal dice que es simulado y la bitácora lo registra; nunca \"enviado\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1608,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:35.416Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "21534e39b3e9e828143c-cd1ea41b4c0f4377b0ff",
+              "file": "07-fase6.spec.js",
+              "line": 36,
+              "column": 3
+            },
+            {
+              "title": "Panel gerencial con los totales reales de la API",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6325,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:37.033Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "21534e39b3e9e828143c-86b3b631850324a1fef8",
+              "file": "07-fase6.spec.js",
+              "line": 54,
+              "column": 3
+            },
+            {
+              "title": "Usuarios: crear un vendedor real que puede iniciar sesión y desactivarlo",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2625,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:43.370Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "21534e39b3e9e828143c-d284380553e326ca0c2f",
+              "file": "07-fase6.spec.js",
+              "line": 75,
+              "column": 3
+            },
+            {
+              "title": "Configuración: emisor real de solo lectura y firmador identificado como simulado",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1289,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-21T03:54:46.008Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "21534e39b3e9e828143c-cc268dd0931d19fc829b",
+              "file": "07-fase6.spec.js",
+              "line": 99,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-21T03:54:01.375Z",
+    "duration": 46464.597,
+    "expected": 21,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
