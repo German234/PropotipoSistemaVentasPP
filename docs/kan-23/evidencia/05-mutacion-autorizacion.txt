@@ -1,0 +1,50 @@
+## M1 — Quitar requireRol('ADMIN') de /api/usuarios
+   archivo: src/routes/usuarios.js
+   cambio:  > router.use(auth);
+   resultado con la mutación: Tests:       10 failed, 134 passed, 144 total
+   restaurado (idéntico)
+
+## M2 — Quitar requireRol('ADMIN') de /api/reportes
+   archivo: src/routes/reportes.js
+   cambio:  > router.use(auth);
+   resultado con la mutación: Tests:       3 failed, 141 passed, 144 total
+   restaurado (idéntico)
+
+## M3 — Borradores: quitar el filtro por dueño (un usuario lee el de otro)
+   archivo: src/services/borradoresService.js
+   cambio:  >   const r = await query(`${SELECT} WHERE b.id = @id`, { id, usuarioId });
+   resultado con la mutación: Tests:       1 failed, 35 passed, 36 total
+   restaurado (idéntico)
+
+## M4 — Usuarios: permitir dejar el sistema sin ADMIN activo
+   archivo: src/services/usuariosService.js
+   cambio:  >       if (false) throw new AppError('ESTADO_INVALIDO', 'Debe quedar al menos un ADMIN activo', 409);
+   resultado con la mutación: Tests:       1 failed, 35 passed, 36 total
+   restaurado (idéntico)
+
+## M5 — Invalidación: permitir al VENDEDOR (política S1)
+   archivo: src/config/politicas.js
+   cambio:  > const ROLES_INVALIDAR = ['ADMIN', 'VENDEDOR'];
+   resultado con la mutación: Tests:       6 failed, 126 passed, 132 total
+   restaurado (idéntico)
+
+## M6 — JWT: aceptar alg none
+   archivo: src/middleware/auth.js
+   cambio:  >     payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256', 'none'] });
+   resultado con la mutación: Tests:       128 passed, 128 total
+   restaurado (idéntico)
+
+## M7 — Correo: responder que sí se envió
+   archivo: src/services/correoService.js
+   cambio:  >   return { dteId: id, numeroControl: d.numeroControl, correo, enviado: true, simulado: true, mensaje: MENSAJE };
+   resultado con la mutación: Tests:       1 failed, 35 passed, 36 total
+   restaurado (idéntico)
+
+git diff de src tras todas las mutaciones (debe estar vacío para archivos versionados):
+warning: in the working copy of 'backend/src/config/politicas.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/middleware/auth.js', LF will be replaced by CRLF the next time Git touches it
+ backend/src/app.js                          | 3 +++
+ backend/src/controllers/dteController.js    | 7 ++++++-
+ backend/src/routes/dte.js                   | 1 +
+ backend/src/services/dteConsultasService.js | 3 ++-
+ 4 files changed, 12 insertions(+), 2 deletions(-)

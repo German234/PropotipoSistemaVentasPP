@@ -30,7 +30,7 @@ Base: `http://localhost:3000/api` · JSON en camelCase · ambiente MH `"00"`.
 | `CSRF_INVALIDO` | 403 | Petición con cookie de sesión sin `X-CSRF-Token` válido |
 | `DEMASIADOS_INTENTOS` | 429 | Login bloqueado temporalmente por intentos fallidos (header `Retry-After` en segundos) |
 | `NO_ENCONTRADO` | 404 | El recurso no existe |
-| `ESTADO_INVALIDO` | 409 | La operación no aplica al estado actual del DTE |
+| `ESTADO_INVALIDO` | 409 | La operación no aplica al estado actual del DTE (o del recurso: p. ej. dejar el sistema sin ADMIN activo) |
 | `STOCK_INSUFICIENTE` | 409 | No hay existencias suficientes |
 | `DB_NO_DISPONIBLE` | 503 | No hay conexión con SQL Server |
 | `MH_NO_DISPONIBLE` | 503 | MH (simulado) no respondió a un evento de invalidación o de contingencia (`X-Simular: contingencia` o `timeout`) |
@@ -393,9 +393,30 @@ Cualquier rol. Consulta de DTE en MH ("¿recibiste este `codigoGeneracion`?"). S
 - `SIN_RESPUESTA` (`X-Simular: contingencia|timeout`) → `respuestaMh: null`; sigue en `CONTINGENCIA`.
 - Cada consulta suma `consultas` y actualiza la posición del DTE en la cola. Bitácora `CONSULTA_MH`.
 
+### POST /api/dte/:id/correo → 200 (Fase 6) — envío SIMULADO
+
+Cualquier rol. **No envía ningún correo** (el prototipo no tiene servidor SMTP): valida el correo y el DTE y registra la acción `CORREO_SIMULADO` en la bitácora. La respuesta siempre lo dice (`enviado: false`, `simulado: true`).
+
+```json
+{ "correo": "cliente@correo.com" }
+```
+
+```json
+{
+  "ok": true,
+  "data": {
+    "dteId": 15, "numeroControl": "DTE-01-M001P001-000000000000015", "correo": "cliente@correo.com",
+    "enviado": false, "simulado": true,
+    "mensaje": "Envío simulado: no se envió ningún correo (el prototipo no tiene servidor SMTP). Quedó registrado en la bitácora."
+  }
+}
+```
+
+Errores: correo vacío o con formato inválido → 400; DTE inexistente → 404; DTE `RECHAZADO` → 409 `ESTADO_INVALIDO`.
+
 ### GET /api/dte?tipo=&estado=&desde=&hasta=&clienteId=
 
-Filtros opcionales: `tipo` (`01|03|05`), `estado` (`PROCESADO|RECHAZADO|CONTINGENCIA|INVALIDADO`), `desde`/`hasta` (`YYYY-MM-DD`, inclusive), `clienteId`. Valor inválido → 400. Más reciente primero.
+Filtros opcionales: `tipo` (`01|03|05`), `estado` (`PROCESADO|RECHAZADO|CONTINGENCIA|INVALIDADO`), `desde`/`hasta` (`YYYY-MM-DD`, inclusive), `clienteId`. Valor inválido → 400. Más reciente primero. `usuario` (Fase 6) = login de quien emitió.
 
 ```json
 {
@@ -405,7 +426,7 @@ Filtros opcionales: `tipo` (`01|03|05`), `estado` (`PROCESADO|RECHAZADO|CONTINGE
       "id": 15, "tipoDte": "01", "numeroControl": "DTE-01-M001P001-000000000000015",
       "codigoGeneracion": "A1B2C3D4-...", "selloRecibido": "2026A1B2...", "estado": "PROCESADO",
       "fechaEmision": "2026-11-04T15:30:00", "receptor": "Consumidor final", "clienteId": null, "total": 11.30,
-      "dteRelacionadoId": null
+      "dteRelacionadoId": null, "usuario": "vendedor"
     }
   ]
 }
@@ -613,6 +634,99 @@ Cualquier rol autenticado. Más reciente primero; `limite` 1–1000 (defecto 200
 
 Forma de `datos` según la acción: `EMISION` → `{ tipoDte, numeroControl, codigoGeneracion, resultado, firmador, mensaje }`; `REINTENTO` → igual sin `firmador` (más `codigoGeneracionEvento` si lo transmitió un evento de contingencia); `INVALIDACION` → `{ tipoDte, numeroControl, codigoGeneracion, codigoGeneracionEvento, resultado, mensaje }`; `CONTINGENCIA` (`entidad: "evento_contingencia"`, `entidadId` = id del evento o `null` si MH no respondió) → `{ codigoGeneracionEvento, origen, cantidad, dteIds, resultado, mensaje }` (el lote automático sin pendientes registra `{ origen: "AUTOMATICO", resultado: "SIN_PENDIENTES", ... }`); `CREAR` → el registro creado; `ACTUALIZAR` → `{ antes, cambios }`; `LOGIN_FALLIDO` → `{ usuario }`; `LOGIN` → `null`.
 
-`accion`: `LOGIN`, `LOGIN_FALLIDO`, `CREAR`, `ACTUALIZAR`, `EMISION`, `REINTENTO`, `INVALIDACION`, `CONTINGENCIA`, `CONSULTA_MH`. `entidad`: `usuario`, `producto`, `cliente`, `dte`, `evento_contingencia`, `programacion_contingencia`, `consultas_mh`.
+`accion`: `LOGIN`, `LOGIN_FALLIDO`, `CREAR`, `ACTUALIZAR`, `ELIMINAR`, `EMISION`, `REINTENTO`, `INVALIDACION`, `CONTINGENCIA`, `CONSULTA_MH`, `CORREO_SIMULADO`. `entidad`: `usuario`, `producto`, `cliente`, `borrador`, `dte`, `evento_contingencia`, `programacion_contingencia`, `consultas_mh`.
+
+Fase 6: `CORREO_SIMULADO` (`entidad: "dte"`) → `{ numeroControl, codigoGeneracion, correo, resultado: "SIMULADO", mensaje }`. En `usuario`, `ACTUALIZAR` guarda `{ antes: {nombre, rol, activo}, cambios }` con `cambios.password = "(cambiada)"` (la contraseña nunca se registra). `ELIMINAR` (borrador) → `null`.
 
 `CONSULTA_MH` (`entidad: "dte"`) → `{ tipoDte, numeroControl, codigoGeneracion, origen, resultado, mensaje }`; `resultado` = `PROCESADO` (MH lo tenía), `NO_ENCONTRADO` o `SIN_RESPUESTA`. Las consultas manuales siempre se registran; las automáticas solo cuando encuentran el DTE (los turnos sin novedad solo actualizan `consultaMh` del DTE).
+
+---
+
+## Usuarios (Fase 6, solo ADMIN)
+
+Otro rol → 403 `SIN_PERMISO`. Nunca se devuelve la contraseña ni su hash.
+
+```json
+{ "id": 3, "usuario": "cajero1", "nombre": "Cajero Uno", "rol": "VENDEDOR", "activo": true, "creadoEn": "2026-11-20T10:00:00" }
+```
+
+### GET /api/usuarios?incluirInactivos=1
+
+Por defecto solo activos; ordenados por `usuario`.
+
+### GET /api/usuarios/:id
+
+404 si no existe.
+
+### POST /api/usuarios → 201
+
+`{ usuario, nombre, rol, password }`. `usuario`: 3–50 caracteres (letras, dígitos, `.`, `_`, `-`), único (repetido → 400). `rol`: `ADMIN` | `VENDEDOR`. `password`: 8 caracteres como mínimo (máx. 72 bytes, límite de bcrypt).
+
+### PUT /api/usuarios/:id
+
+Parcial: `{ nombre?, rol?, activo?, password? }`. `usuario` (el login) no se cambia → 400.
+Reglas: nadie se desactiva ni se quita el rol `ADMIN` a sí mismo (400); siempre queda al menos un `ADMIN` activo (409 `ESTADO_INVALIDO`). Un usuario desactivado ya no puede iniciar sesión (`CREDENCIALES`); un token que ya tenía sigue vigente hasta vencer (8 h): no hay revocación de JWT en el servidor.
+
+---
+
+## Borradores (Fase 6, cualquier rol)
+
+Venta sin emitir del usuario de la sesión. Cada usuario ve y modifica **solo los suyos**: el de otro responde 404. No reservan stock ni consumen correlativo. `totalEstimado` usa los precios vigentes y el cálculo de 01/03 (solo líneas `disponible`); el total definitivo lo da la emisión. El frontend borra el borrador al emitir (salvo que MH lo rechace).
+
+```json
+{
+  "id": 1, "tipoDte": "03", "clienteId": 3,
+  "cliente": { "id": 3, "nombre": "Distribuidora El Roble, S.A. de C.V.", "tipo": "CONTRIBUYENTE" },
+  "usuario": "vendedor",
+  "items": [ { "productoId": 1, "cantidad": 40, "codigo": "P001", "descripcion": "Cuaderno universitario 100 hojas", "precio": 2.50, "stock": 100, "disponible": true } ],
+  "totalEstimado": 113.00,
+  "creadoEn": "2026-11-20T10:00:00", "actualizadoEn": "2026-11-20T10:05:00"
+}
+```
+
+`disponible: false` = el producto se desactivó o eliminó después de guardar el borrador.
+
+### GET /api/borradores
+
+Los del usuario, el más reciente primero.
+
+### GET /api/borradores/:id
+
+### POST /api/borradores → 201
+
+`{ tipoDte: "01"|"03", clienteId?: number|null, items: [{ productoId, cantidad }] }`. 1–100 líneas, `cantidad` entero ≥ 1; líneas del mismo producto se suman. Producto o cliente inexistente/inactivo → 404. El cliente de un 03 se valida al emitir, no aquí.
+
+### PUT /api/borradores/:id
+
+Reemplaza el contenido (mismo cuerpo que POST).
+
+### DELETE /api/borradores/:id
+
+```json
+{ "ok": true, "data": { "id": 1, "eliminado": true } }
+```
+
+Bitácora: `CREAR`, `ACTUALIZAR`, `ELIMINAR` con `entidad: "borrador"`.
+
+---
+
+## Reportes (Fase 6, solo ADMIN)
+
+### GET /api/reportes/resumen?desde=&hasta=&tipo=
+
+`desde`/`hasta` `YYYY-MM-DD` (por defecto del día 1 del mes actual a hoy; máx. 366 días; `desde` > `hasta` → 400). `tipo` `01|03|05` filtra todo el reporte.
+Definiciones: **vigente** = `PROCESADO` o `CONTINGENCIA`. `ventasBrutas` = total de 01 + 03 vigentes; `notasCredito` = total de 05 vigentes; `ventasNetas` = la resta; `iva` = IVA de 01 + 03 − IVA de 05; `documentos` y `ticketPromedio` cuentan solo 01 + 03 vigentes. `RECHAZADO` e `INVALIDADO` solo aparecen en `porEstado`. `porDia` trae todos los días del período (con ceros).
+
+```json
+{
+  "ok": true,
+  "data": {
+    "periodo": { "desde": "2026-11-01", "hasta": "2026-11-30", "tipo": null },
+    "totales": { "ventasBrutas": 118.66, "notasCredito": 11.30, "ventasNetas": 107.36, "iva": 12.35, "documentos": 2, "ticketPromedio": 59.33 },
+    "porEstado": { "PROCESADO": 3, "CONTINGENCIA": 0, "RECHAZADO": 1, "INVALIDADO": 0 },
+    "porDia": [ { "fecha": "2026-11-01", "documentos": 0, "total": 0 }, { "fecha": "2026-11-20", "documentos": 2, "total": 118.66 } ],
+    "porTipo": [ { "tipoDte": "01", "documentos": 1, "total": 5.66 }, { "tipoDte": "03", "documentos": 1, "total": 113.00 }, { "tipoDte": "05", "documentos": 1, "total": 11.30 } ],
+    "porVendedor": [ { "usuario": "admin", "nombre": "Administrador", "documentos": 2, "total": 118.66, "notasCredito": 11.30 } ]
+  }
+}
+```

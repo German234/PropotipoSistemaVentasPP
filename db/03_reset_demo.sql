@@ -3,7 +3,8 @@
    Borra DTE, eventos de invalidación y de contingencia, bitácora y ejecuciones de tareas programadas;
    la configuración de esas tareas vuelve a la de backend/.env; reinicia correlativos (01/03/05 = 0);
    restaura stock/precio/estado de los productos y clientes del seed y elimina los creados después.
-   NO toca usuarios ni emisor. Ejecutar con:
+   Fase 6: borra los borradores y deja solo los usuarios del seed (admin/admin123, vendedor/vendedor123) con
+   sus datos y contraseñas originales. NO toca el emisor. Ejecutar con:
      sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql
    ========================================================= */
 USE BatallonAtlacatl;
@@ -25,6 +26,8 @@ DELETE FROM dbo.bitacora;
    (la configuración vuelve a los valores de backend/.env en el siguiente arranque o consulta) */
 IF OBJECT_ID('dbo.ejecucion_tarea', 'U') IS NOT NULL DELETE FROM dbo.ejecucion_tarea;
 IF OBJECT_ID('dbo.config_tarea', 'U') IS NOT NULL DELETE FROM dbo.config_tarea;
+/* Fase 6: borradores (referencian clientes y usuarios: van antes de limpiar ambos) */
+IF OBJECT_ID('dbo.borrador', 'U') IS NOT NULL DELETE FROM dbo.borrador;
 
 UPDATE dbo.correlativos SET ultimo = 0;
 
@@ -75,6 +78,20 @@ UPDATE c SET c.tipo = s.tipo, c.nombre_comercial = s.nombre_comercial, c.tipo_do
              c.direccion_municipio = s.mun, c.direccion_distrito = s.dis, c.telefono = s.telefono, c.correo = s.correo,
              c.activo = 1
 FROM dbo.clientes c JOIN @seed s ON s.nombre = c.nombre;
+
+/* usuarios (Fase 6, desde que se administran en la UI): solo los 2 del seed, activos, con su nombre, rol y
+   contraseña originales (mismos hashes que 02_seed.sql). Los creados después se eliminan: ya no tienen DTE,
+   eventos, bitácora, borradores ni configuración de tareas que los referencien. */
+DECLARE @usr TABLE (usuario NVARCHAR(50), nombre NVARCHAR(150), password_hash NVARCHAR(100), rol NVARCHAR(10));
+INSERT INTO @usr VALUES
+    ('admin',    N'Administrador',     '$2a$10$2FCV0qffSS9PAQzbxr7byeHn6MK2npuK2l5bB1OcTu1mW5iyFSp6.', 'ADMIN'),
+    ('vendedor', N'Vendedor de Turno', '$2a$10$9vKJV9ViZSioUZdva0cmReEK66PWwKxQmF4S7eiBi3iS9gvRYgBXG', 'VENDEDOR');
+DELETE FROM dbo.usuarios WHERE usuario NOT IN (SELECT usuario FROM @usr);
+INSERT INTO dbo.usuarios (usuario, nombre, password_hash, rol)
+SELECT s.usuario, s.nombre, s.password_hash, s.rol FROM @usr s
+WHERE NOT EXISTS (SELECT 1 FROM dbo.usuarios u WHERE u.usuario = s.usuario);
+UPDATE u SET u.nombre = s.nombre, u.password_hash = s.password_hash, u.rol = s.rol, u.activo = 1
+FROM dbo.usuarios u JOIN @usr s ON s.usuario = u.usuario;
 
 COMMIT TRANSACTION;
 

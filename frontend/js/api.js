@@ -172,6 +172,8 @@ var api = (function () {
       reintentar: function (id, simular) { return request('POST', '/dte/' + id + '/reintentar', { simular: simular }); },
       /** C3: consulta de DTE en MH (solo DTE en CONTINGENCIA) → { resultado: ENCONTRADO|NO_ENCONTRADO|SIN_RESPUESTA, estado, ... } */
       consultar: function (id, simular) { return request('POST', '/dte/' + id + '/consultar', { simular: simular }); },
+      /** Fase 6: envío por correo SIMULADO (no sale ningún correo; solo bitácora) → { enviado:false, simulado:true, mensaje, ... } */
+      correo: function (id, correo) { return request('POST', '/dte/' + id + '/correo', { body: { correo: correo } }); },
       listar: function (filtros) { return request('GET', '/dte', { query: filtros }); },     // {tipo, estado, desde, hasta, clienteId}
       obtener: function (id) { return request('GET', '/dte/' + id); },
       /** GET /dte/:id/pdf → Promise<Blob> (binario, no JSON). Los errores llegan como ApiError. */
@@ -203,6 +205,28 @@ var api = (function () {
       configurarConsultas: function (body) { return request('PUT', '/contingencia/consultas', { body: body }); }
     },
 
-    bitacora: function (filtros) { return request('GET', '/bitacora', { query: filtros }); } // {accion, entidad, dteId, usuario, desde, hasta, limite}
+    bitacora: function (filtros) { return request('GET', '/bitacora', { query: filtros }); }, // {accion, entidad, dteId, usuario, desde, hasta, limite}
+
+    /** Fase 6: administración de usuarios (solo ADMIN) */
+    usuarios: {
+      listar: function (q) { return request('GET', '/usuarios', { query: q }); },          // {incluirInactivos}
+      obtener: function (id) { return request('GET', '/usuarios/' + id); },
+      crear: function (u) { return request('POST', '/usuarios', { body: u }); },           // {usuario, nombre, rol, password}
+      actualizar: function (id, cambios) { return request('PUT', '/usuarios/' + id, { body: cambios }); } // {nombre?, rol?, activo?, password?}
+    },
+
+    /** Fase 6: borradores de venta del usuario de la sesión */
+    borradores: {
+      listar: function () { return request('GET', '/borradores'); },
+      obtener: function (id) { return request('GET', '/borradores/' + id); },
+      crear: function (b) { return request('POST', '/borradores', { body: b }); },         // {tipoDte, clienteId?, items:[{productoId,cantidad}]}
+      actualizar: function (id, b) { return request('PUT', '/borradores/' + id, { body: b }); },
+      eliminar: function (id) { return request('DELETE', '/borradores/' + id); }
+    },
+
+    /** Fase 6: reportes gerenciales (solo ADMIN) */
+    reportes: {
+      resumen: function (filtros) { return request('GET', '/reportes/resumen', { query: filtros }); } // {desde, hasta, tipo}
+    }
   };
 })();

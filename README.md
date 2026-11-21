@@ -96,7 +96,7 @@ El guion de la demo de 5 minutos está en [docs/DEMO.md](docs/DEMO.md).
 
 ## Reiniciar los datos de la demo
 
-Borra todos los DTE, los eventos, la bitácora y el registro de ejecuciones de las tareas programadas, pone los correlativos en 0, restaura productos y clientes del seed y devuelve la configuración del lote automático y de la cola de consultas a los valores del `.env`. No toca usuarios ni emisor.
+Borra todos los DTE, los eventos, la bitácora y el registro de ejecuciones de las tareas programadas, pone los correlativos en 0, restaura productos y clientes del seed y devuelve la configuración del lote automático y de la cola de consultas a los valores del `.env`. Desde la Fase 6 también borra los borradores y deja solo los usuarios del seed (`admin`/`admin123`, `vendedor`/`vendedor123`) con sus contraseñas originales: los usuarios creados en *Administración → Usuarios* se eliminan. No toca el emisor.
 
 ```bash
 sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql

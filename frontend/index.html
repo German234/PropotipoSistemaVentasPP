@@ -491,7 +491,7 @@
           <h2 id="v-title">Nueva venta</h2>
         </div>
         <div class="top-right">
-          <span class="badge badge-online"><span class="dot"></span><span class="badge-text">MH en línea</span></span>
+          <span class="badge badge-online"><span class="dot"></span><span class="badge-text" title="Hacienda simulada por el backend, ambiente 00 (pruebas)">MH simulado</span></span>
           <span class="avatar" id="v-avatar">--</span>
         </div>
       </header>
@@ -543,7 +543,8 @@
                 </select>
               </div>
               <button class="btn btn-primary btn-block" id="v-confirmar" style="margin-top:16px" onclick="confirmSale()">✓ Confirmar venta</button>
-              <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="toast('Venta guardada como borrador')">Guardar borrador</button>
+              <button class="btn btn-ghost btn-block" style="margin-top:10px" id="v-borrador-btn" onclick="guardarBorrador()">Guardar borrador</button>
+              <div class="muted small" id="v-borrador-info" style="display:none;margin-top:8px;text-align:center"></div>
             </div>
           </div>
         </div>
@@ -586,16 +587,14 @@
           </div>
         </div>
 
-        <!-- Borradores -->
+        <!-- Borradores (Fase 6: GET/PUT/DELETE /api/borradores, solo los del usuario) -->
         <div class="panel" id="v-borradores" style="display:none">
           <div class="card card-pad">
-            <div class="page-head"><h3>Borradores</h3><span class="muted small">2 sin confirmar</span></div>
+            <div class="page-head"><h3>Borradores</h3><span class="muted small" id="bo-count"></span></div>
+            <p class="cont-note">Ventas guardadas sin emitir. No reservan stock ni consumen número de control; el total es un estimado con los precios actuales. Al emitir la venta, el borrador se elimina.</p>
             <table>
-              <thead><tr><th>Cliente</th><th class="num">Ítems</th><th class="num">Total est.</th><th>Estado</th><th class="num">Acción</th></tr></thead>
-              <tbody>
-                <tr><td>Mini Súper La Esquina</td><td class="num">3</td><td class="num">$156.00</td><td><span class="st st-draft">Borrador</span></td><td class="num"><button class="link" onclick="setPanelById('vendedor','v-venta')">Continuar</button></td></tr>
-                <tr><td>Cliente sin asignar</td><td class="num">1</td><td class="num">$28.00</td><td><span class="st st-draft">Borrador</span></td><td class="num"><button class="link" onclick="setPanelById('vendedor','v-venta')">Continuar</button></td></tr>
-              </tbody>
+              <thead><tr><th>#</th><th>Tipo</th><th>Cliente</th><th class="num">Ítems</th><th class="num">Total est.</th><th>Actualizado</th><th class="num">Acciones</th></tr></thead>
+              <tbody id="bo-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -703,82 +702,62 @@
           <h2 id="g-title">Panel de ventas</h2>
         </div>
         <div class="top-right filters">
-          <select class="pill"><option>Junio 2026</option><option>Mayo 2026</option><option>Abril 2026</option></select>
-          <select class="pill"><option>Todos</option><option>Factura 01</option><option>Créd. fiscal 03</option></select>
+          <input type="month" class="pill" id="g-mes" onchange="cargarGerente()" title="Período del reporte">
+          <select class="pill" id="g-tipo" onchange="cargarGerente()"><option value="">Todos los tipos</option><option value="01">Factura 01</option><option value="03">Créd. fiscal 03</option><option value="05">Nota crédito 05</option></select>
         </div>
       </header>
       <div class="content">
 
-        <!-- Dashboard -->
+        <!-- Dashboard (Fase 6: GET /api/reportes/resumen) -->
         <div class="panel" id="g-dash">
+          <p class="cont-note" id="g-periodo">Cargando…</p>
           <div class="kpi-grid">
-            <div class="kpi"><div class="label">Ventas del mes</div><div class="val">$48,320</div><div class="delta up">▲ +12%</div></div>
-            <div class="kpi"><div class="label">Documentos emitidos</div><div class="val">1,284</div><div class="delta up">▲ +8%</div></div>
-            <div class="kpi"><div class="label">Ticket promedio</div><div class="val">$37.60</div><div class="delta down">▼ −3%</div></div>
-            <div class="kpi"><div class="label">Pendientes contingencia</div><div class="val" id="kpi-contingencia">—</div><div class="delta flat">En cola</div></div>
+            <div class="kpi"><div class="label">Ventas netas</div><div class="val" id="kpi-netas">—</div><div class="delta flat" id="kpi-netas-sub"></div></div>
+            <div class="kpi"><div class="label">Documentos de venta</div><div class="val" id="kpi-docs">—</div><div class="delta flat" id="kpi-docs-sub"></div></div>
+            <div class="kpi"><div class="label">Ticket promedio</div><div class="val" id="kpi-ticket">—</div><div class="delta flat">Ventas brutas ÷ documentos</div></div>
+            <div class="kpi"><div class="label">Pendientes contingencia</div><div class="val" id="kpi-contingencia">—</div><div class="delta flat">En cola (todas las fechas)</div></div>
           </div>
           <div class="charts">
             <div class="card card-pad">
               <div class="card-title">Ventas por día</div>
-              <div class="bars">
-                <div class="bar-col"><div class="bar" style="height:38%"></div><span class="lbl">Lun</span></div>
-                <div class="bar-col"><div class="bar" style="height:55%"></div><span class="lbl">Mar</span></div>
-                <div class="bar-col"><div class="bar" style="height:46%"></div><span class="lbl">Mié</span></div>
-                <div class="bar-col"><div class="bar" style="height:72%"></div><span class="lbl">Jue</span></div>
-                <div class="bar-col"><div class="bar" style="height:60%"></div><span class="lbl">Vie</span></div>
-                <div class="bar-col"><div class="bar" style="height:88%"></div><span class="lbl">Sáb</span></div>
-                <div class="bar-col"><div class="bar" style="height:64%"></div><span class="lbl">Dom</span></div>
-              </div>
+              <div class="bars" id="g-bars" style="gap:3px"></div>
             </div>
             <div class="card card-pad">
               <div class="card-title">Por tipo de DTE</div>
               <div class="donut-wrap">
-                <div class="donut"></div>
-                <div class="legend">
-                  <div class="li"><span class="sw" style="background:var(--blue)"></span> Factura (01) — 68%</div>
-                  <div class="li"><span class="sw" style="background:#bcd6ee"></span> Créd. fiscal (03) — 32%</div>
-                </div>
+                <div class="donut" id="g-donut"></div>
+                <div class="legend" id="g-legend"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Ventas -->
+        <!-- Ventas (Fase 6: GET /api/dte del período) -->
         <div class="panel" id="g-ventas" style="display:none">
           <div class="card card-pad">
-            <div class="page-head"><h3>Transacciones</h3><button class="btn btn-ghost" onclick="toast('Reporte exportado (CSV)')">⬇ Exportar CSV</button></div>
+            <div class="page-head"><h3>Transacciones del período</h3><span class="muted small" id="gv-count"></span><button class="btn btn-ghost" onclick="exportarVentasCsv()">⬇ Exportar CSV</button></div>
             <table>
-              <thead><tr><th>DTE</th><th>Vendedor</th><th>Cliente</th><th>Tipo</th><th class="num">Total</th><th>Estado</th></tr></thead>
-              <tbody>
-                <tr><td>#001284</td><td>J. Hernández</td><td>Comercial El Roble</td><td>Factura 01</td><td class="num">$689.30</td><td><span class="st st-sealed">Sellado</span></td></tr>
-                <tr><td>#001283</td><td>M. Rodríguez</td><td>Distribuidora Cruz</td><td>Créd. fiscal 03</td><td class="num">$1,245.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
-                <tr><td>#001282</td><td>A. Cálix</td><td>Mini Súper La Esquina</td><td>Factura 01</td><td class="num">$156.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
-                <tr><td>#001281</td><td>J. Hernández</td><td>Ana Cálix</td><td>Factura 01</td><td class="num">$42.50</td><td><span class="st st-pending">Contingencia</span></td></tr>
-                <tr><td>#001278</td><td>M. Rodríguez</td><td>Ferretería Santos</td><td>Créd. fiscal 03</td><td class="num">$910.00</td><td><span class="st st-sealed">Sellado</span></td></tr>
-              </tbody>
+              <thead><tr><th>N° control</th><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Tipo</th><th class="num">Total</th><th>Estado</th></tr></thead>
+              <tbody id="gv-tbody"></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Reportes -->
+        <!-- Reportes (Fase 6: GET /api/reportes/resumen) -->
         <div class="panel" id="g-reportes" style="display:none">
           <div class="two-col" style="margin-top:0">
             <div class="card card-pad">
               <div class="card-title">Ventas por vendedor</div>
               <table>
-                <thead><tr><th>Vendedor</th><th class="num">Docs</th><th class="num">Total</th></tr></thead>
-                <tbody>
-                  <tr><td>J. Hernández</td><td class="num">512</td><td class="num">$19,840</td></tr>
-                  <tr><td>M. Rodríguez</td><td class="num">438</td><td class="num">$17,210</td></tr>
-                  <tr><td>A. Cálix</td><td class="num">334</td><td class="num">$11,270</td></tr>
-                </tbody>
+                <thead><tr><th>Vendedor</th><th class="num">Docs</th><th class="num">Ventas</th><th class="num">Notas crédito</th></tr></thead>
+                <tbody id="gr-vend-tbody"></tbody>
               </table>
             </div>
             <div class="card card-pad">
               <div class="card-title">Descargar reportes</div>
-              <p class="muted small" style="margin-bottom:16px">Genera un reporte consolidado del período seleccionado para análisis externo.</p>
-              <button class="btn btn-ghost btn-block" style="margin-bottom:10px" onclick="toast('Reporte exportado (CSV)')">⬇ Exportar a CSV</button>
-              <button class="btn btn-ghost btn-block" onclick="toast('Reporte exportado (PDF)')">⬇ Exportar a PDF</button>
+              <p class="muted small" style="margin-bottom:16px">Reporte consolidado del período y tipo seleccionados (totales, por día, por tipo y por vendedor), generado con los datos reales.</p>
+              <button class="btn btn-ghost btn-block" onclick="exportarResumenCsv()">⬇ Exportar a CSV</button>
+              <p class="muted small" style="margin-top:12px">Exportar a PDF no está disponible en el prototipo.</p>
             </div>
           </div>
         </div>
@@ -811,48 +790,36 @@
           <h2 id="a-title">Administración</h2>
         </div>
         <div class="top-right">
-          <button class="btn btn-primary" onclick="toast('Formulario de nuevo usuario')">+ Nuevo usuario</button>
+          <button class="btn btn-primary" onclick="nuevoUsuario()">+ Nuevo usuario</button>
         </div>
       </header>
       <div class="content">
 
-        <!-- Usuarios -->
+        <!-- Usuarios (Fase 6: GET/POST/PUT /api/usuarios, solo ADMIN) -->
         <div class="panel" id="a-usuarios">
-          <div class="card card-pad" style="margin-bottom:16px">
-            <table>
-              <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th class="num">Acciones</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><div class="u-cell"><span class="avatar">MR</span> María Rodríguez</div></td>
-                  <td>Gerente de ventas</td><td><span class="st st-active">Activo</span></td>
-                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
-                </tr>
-                <tr>
-                  <td><div class="u-cell"><span class="avatar">JH</span> José Hernández</div></td>
-                  <td>Vendedor operativo</td><td><span class="st st-active">Activo</span></td>
-                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
-                </tr>
-                <tr>
-                  <td><div class="u-cell"><span class="avatar">AC</span> Ana Cálix</div></td>
-                  <td>Vendedor operativo</td><td><span class="st st-inactive">Inactivo</span></td>
-                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
-                </tr>
-                <tr>
-                  <td><div class="u-cell"><span class="avatar">CM</span> Carlos Mejía</div></td>
-                  <td>Administrador</td><td><span class="st st-active">Activo</span></td>
-                  <td><div class="row-actions"><button class="icon-btn" onclick="toast('Editar usuario')">✏️</button><button class="icon-btn del" onclick="toast('Usuario desactivado')">🗑️</button></div></td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="sale-grid" style="margin-bottom:16px">
+            <div class="card card-pad">
+              <div class="page-head" style="margin-bottom:10px"><div class="card-title" style="margin:0">Usuarios</div>
+                <label class="muted small" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="u-inactivos" onchange="cargarUsuarios()"> Ver inactivos</label></div>
+              <table>
+                <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th class="num">Acciones</th></tr></thead>
+                <tbody id="u-tbody"></tbody>
+              </table>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title" id="u-form-title">Nuevo usuario</div>
+              <div class="field"><label>Usuario (login) <span class="req">*</span></label><input id="u-usuario" placeholder="Ej. cajero1" autocomplete="off"></div>
+              <div class="field"><label>Nombre <span class="req">*</span></label><input id="u-nombre" placeholder="Nombre completo"></div>
+              <div class="field"><label>Rol <span class="req">*</span></label><select id="u-rol"><option value="VENDEDOR">Vendedor</option><option value="ADMIN">Administrador</option></select></div>
+              <div class="field"><label id="u-pass-label">Contraseña <span class="req">*</span></label><input id="u-password" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password"></div>
+              <button class="btn btn-primary btn-block" id="u-save" onclick="guardarUsuario()">+ Crear usuario</button>
+              <button class="btn btn-ghost btn-block" id="u-cancel" style="margin-top:8px;display:none" onclick="limpiarFormUsuario()">Cancelar edición</button>
+            </div>
           </div>
           <div class="two-col" style="margin-top:0">
             <div class="card card-pad">
               <div class="card-title">Bitácora de actividad</div>
-              <div class="log">
-                <div class="log-item"><span class="dot"></span><div><div class="t">Emisión DTE Tipo 01 #001284</div><div class="ts">hace 2 min</div></div></div>
-                <div class="log-item"><span class="dot"></span><div><div class="t">Inicio de sesión — J. Hernández</div><div class="ts">hace 14 min</div></div></div>
-                <div class="log-item"><span class="dot"></span><div><div class="t">Reenvío contingencia #001190</div><div class="ts">hace 1 h</div></div></div>
-              </div>
+              <div class="log" id="u-log"></div>
             </div>
             <div class="card card-pad">
               <div class="page-head" style="margin-bottom:12px"><div class="card-title" style="margin:0">Cola de contingencia</div><span class="st st-pending" id="cq-badge">— pendientes</span></div>
@@ -948,7 +915,7 @@
                   <option value="">Todas las acciones</option>
                   <option value="EMISION">Emisión DTE</option><option value="REINTENTO">Reintento</option><option value="INVALIDACION">Invalidación</option><option value="CONTINGENCIA">Evento de contingencia</option>
                   <option value="LOGIN">Inicio de sesión</option><option value="LOGIN_FALLIDO">Login fallido</option>
-                  <option value="CREAR">Crear</option><option value="ACTUALIZAR">Actualizar</option>
+                  <option value="CREAR">Crear</option><option value="ACTUALIZAR">Actualizar</option><option value="ELIMINAR">Eliminar</option><option value="CORREO_SIMULADO">Correo (simulado)</option>
                 </select>
                 <input type="text" class="pill" id="b-usuario" placeholder="Usuario" oninput="cargarBitacoraDiferido()" style="width:120px">
                 <input type="date" class="pill" id="b-desde" title="Desde" onchange="cargarBitacora()">
@@ -966,24 +933,17 @@
           </div>
         </div>
 
-        <!-- Configuración -->
+        <!-- Configuración (Fase 6: emisor real de GET /api/emisor, solo lectura) -->
         <div class="panel" id="a-config" style="display:none">
           <div class="card card-pad">
             <div class="card-title">Datos del emisor</div>
-            <div class="form-grid">
-              <div class="field"><label>Nombre comercial</label><input value="Comercial Atlacatl, S.A. de C.V."></div>
-              <div class="field"><label>NIT</label><input value="0614-XXXXXX-XXX-X"></div>
-              <div class="field"><label>NRC</label><input value="123456-7"></div>
-              <div class="field"><label>Dirección</label><input value="Antiguo Cuscatlán, La Libertad"></div>
-            </div>
-            <div class="card-title" style="margin-top:22px">Certificado de firma electrónica</div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
-              <div><div style="font-weight:500">certificado_mh.crt</div><div class="muted small">Vigente · vence 12/2026</div></div>
-              <span class="st st-active">Habilitado</span>
-            </div>
-            <div class="form-actions">
-              <button class="btn btn-ghost" onclick="logout()">Cancelar</button>
-              <button class="btn btn-primary" onclick="toast('Configuración guardada')">Guardar cambios</button>
+            <p class="cont-note">Solo lectura: son los datos con los que se emiten los DTE (tabla <code>emisor</code>, cargada por <code>db/02_seed.sql</code>). El prototipo no permite editarlos.</p>
+            <div id="cfg-emisor"><p class="muted small">Cargando…</p></div>
+            <div class="card-title" style="margin-top:22px">Firma electrónica</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+              <div><div style="font-weight:500">Firmador simulado — sin certificado</div>
+                <div class="muted small">No hay certificado ni firmador del MH: el backend genera un JWS falso (sin validez legal) y Hacienda también es simulada. Ambiente 00 (pruebas).</div></div>
+              <span class="st st-pending">Simulado</span>
             </div>
           </div>
         </div>
@@ -1063,16 +1023,17 @@
 <div class="modal-overlay" id="email-modal" onclick="if(event.target===this)closeEmailModal()">
   <div class="modal" style="max-width:460px">
     <div class="modal-head">
-      <h3>Enviar por correo</h3>
+      <h3>Enviar por correo <span class="st st-pending" style="vertical-align:2px">Simulado</span></h3>
       <button class="modal-x" onclick="closeEmailModal()">✕</button>
     </div>
-    <p class="muted small" style="margin-bottom:14px">Se enviará el DTE <span id="email-dte" style="font-weight:600;color:var(--ink)"></span> en formato PDF al correo indicado.</p>
+    <p class="muted small" style="margin-bottom:10px">DTE <span id="email-dte" style="font-weight:600;color:var(--ink)"></span></p>
+    <p class="cont-note" style="margin-bottom:14px">El prototipo no tiene servidor de correo: <b>no se envía ningún correo</b>. "Registrar envío simulado" solo deja constancia en la bitácora. Para entregar el DTE al cliente, descarga el PDF.</p>
     <div class="field"><label>Correo electrónico</label><input type="email" id="email-input" placeholder="cliente@correo.com"></div>
     <div class="form-actions" style="margin-top:10px;justify-content:space-between">
       <button class="btn btn-soft" onclick="downloadPdf()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Descargar PDF</button>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" onclick="closeEmailModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="sendEmail()">Enviar</button>
+        <button class="btn btn-primary" id="email-send" onclick="sendEmail()">Registrar envío simulado</button>
       </div>
     </div>
   </div>

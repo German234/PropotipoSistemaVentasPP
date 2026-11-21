@@ -277,3 +277,20 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ejecucion_tarea')
     CREATE INDEX ix_ejecucion_tarea ON dbo.ejecucion_tarea (tarea, id DESC);
 GO
+
+/* ---------- Fase 6: borradores de venta (carrito sin emitir, por usuario) ----------
+   items = JSON [{productoId, cantidad}]. No reservan stock ni consumen correlativo. */
+IF OBJECT_ID('dbo.borrador', 'U') IS NULL
+CREATE TABLE dbo.borrador (
+    id              INT IDENTITY(1,1) PRIMARY KEY,
+    usuario_id      INT           NOT NULL REFERENCES dbo.usuarios(id),
+    tipo_dte        CHAR(2)       NOT NULL CONSTRAINT ck_borrador_tipo CHECK (tipo_dte IN ('01','03')),
+    cliente_id      INT           NULL REFERENCES dbo.clientes(id),
+    items           NVARCHAR(MAX) NOT NULL CONSTRAINT ck_borrador_items CHECK (ISJSON(items) = 1),
+    creado_en       DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME(),
+    actualizado_en  DATETIME2(0)  NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_borrador_usuario')
+    CREATE INDEX ix_borrador_usuario ON dbo.borrador (usuario_id, actualizado_en DESC);
+GO

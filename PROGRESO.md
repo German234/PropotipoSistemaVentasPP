@@ -27,6 +27,8 @@
 - **Q2 Evidencia de QA (Fase 4) — HECHO (2026-11-20).** Ejecución registrada en `docs/qa/2026-11-20/`: `npm ci` OK; `npm test` **458/458 en 22 suites**; cobertura backend **96.39 % sentencias · 84.42 % ramas · 98.22 % funciones · 98.20 % líneas**; e2e Playwright **16/16**; BD de la demo sin cambios (huella SHA-256 de 12 tablas). Nuevas: matriz de autorización (74), regresión del reset (1), 6 archivos e2e. Defecto corregido: el reset no restauraba los clientes del seed. **Estas son las cifras vigentes**; las de bloques anteriores son históricas.
 - **S2 Seguridad (Fase 3) — HECHO (2026-11-20).** CORS por lista, 500 genéricos, límite de intentos de login (429), sesión del navegador en cookie HttpOnly + CSRF (Bearer sigue igual), credenciales demo solo en local, cabeceras + CSP, `uuid` eliminado. Detalle, riesgos y pruebas en `docs/SEGURIDAD.md`. 383 pruebas en verde. Cambio de contrato (ver abajo).
 - **KAN-34 Edición de clientes — HECHO (2026-11-20).** Botón Editar por cliente, formulario en modo edición con catálogos MH en cascada, `PUT /api/clientes/:id`, actualización de la fila sin recargar. 346 pruebas en verde. Sin cambios de contrato.
+- **F7 Evidencias KAN-23: seguridad, QA y riesgos (Fase 7) — HECHO (2026-11-20).** Carpeta `docs/kan-23/`: matriz de 28 controles (25 verificados con prueba) y 10 pendientes, autorización ruta × rol (40/40 rutas, 108 casos), 11 hallazgos corregidos y 11 abiertos (3 medios), QA (560/560 casos, cobertura 96.72/84.86/98.34/98.45), 6 defectos, trazabilidad 46/46 requisitos generada desde los resultados, mutación de controles 6/7 (1 equivalente), matriz de 30 riesgos (residual 2 altos, 10 medios, 18 bajos). BD de la demo intacta (huella). Sin cambios de contrato.
+- **F6 Pantallas que eran maqueta (Fase 6) — HECHO (2026-11-20).** Borradores con backend real, envío por correo **simulado y declarado como tal** (solo bitácora), panel gerencial con `GET /api/reportes/resumen`, CRUD de usuarios y emisor real en solo lectura con el firmador identificado como simulado. Ningún botón dice que guardó/envió/exportó sin hacerlo. Jest 537/537 (24 suites), e2e 21/21. **Aplicar `db/01_schema.sql` a la BD de la demo** (tabla `borrador`). Cambio de contrato (ver abajo).
 - ✅ **MVP COMPLETO (2026-11-04).** Backend B1–B4 + frontend F1–F4 integrados: login con roles, catálogos, emisión 01/03/05, invalidación, contingencia y reintento, transacciones y bitácora, todo contra SQL Server. Guion de demo verificado de punta a punta.
 
 ## Mapa de archivos
@@ -51,12 +53,20 @@
 | `backend/tests/integration/autorizacion.test.js` | Matriz de autorización: 28 rutas × sin token / token manipulado / VENDEDOR / ADMIN |
 | `backend/tests/integration/resetDemo.test.js` | Regresión: `db/03_reset_demo.sql` restaura los clientes del seed |
 | `backend/tests/tools/huellaBdDemo.js` | Huella de solo lectura (filas + SHA-256 por tabla) de la BD de la demo; `--comparar` |
+| `backend/tests/tools/reporteKan23.js` | Fase 7: genera `docs/kan-23/generado/` (trazabilidad, autorización ruta × rol, casos, cobertura) desde los resultados de Jest/Playwright; sale con 1 si un requisito queda sin pruebas o falla |
+| `docs/kan-23/` | Fase 7 (hito KAN-23): `README.md` (índice y cómo reproducir), `SEGURIDAD.md`, `QA.md`, `RIESGOS.md`, `generado/` y `evidencia/` (salidas, cobertura, e2e, mutación, huellas, barrido de secretos) |
 | `docs/qa/2026-11-20/` | Evidencia de QA: `INFORME.md`, salidas de comandos, cobertura, reporte y capturas e2e, huellas de la BD |
 | `backend/src/config/seguridad.js` | Config de seguridad desde `.env`: orígenes CORS, límite de login, cookie Secure, credenciales demo, JWT_SECRET débil |
 | `backend/src/middleware/seguridad.js` | `corsConfigurado` (lista de orígenes) y `cabecerasSeguridad` (CSP, nosniff, frame, referrer, no-store en /api) |
 | `backend/src/middleware/limiteLogin.js` | Límite de intentos fallidos de login en memoria (usuario+IP e IP) → 429 |
 | `backend/src/utils/cookies.js` | Cookies `pos_token` (HttpOnly) y `pos_csrf`: leer, poner y borrar |
 | `docs/SEGURIDAD.md` | Fase 3: cada cambio de seguridad, riesgo corregido, prueba y variables de entorno |
+| `backend/src/services/usuariosService.js`, `controllers/usuariosController.js`, `routes/usuarios.js` | Fase 6: `GET/POST/PUT /api/usuarios` (solo ADMIN): bcrypt, no auto-desactivarse, siempre un ADMIN activo (UPDLOCK) |
+| `backend/src/services/borradoresService.js`, `controllers/borradoresController.js`, `routes/borradores.js` | Fase 6: `GET/POST/PUT/DELETE /api/borradores` (por usuario; total estimado con `calculos.js`) |
+| `backend/src/services/reportesService.js`, `routes/reportes.js` | Fase 6: `GET /api/reportes/resumen` (solo ADMIN): totales, por día/tipo/vendedor/estado en centavos |
+| `backend/src/services/correoService.js` | Fase 6: `POST /api/dte/:id/correo` SIMULADO (solo bitácora `CORREO_SIMULADO`, `enviado:false`) |
+| `backend/tests/integration/fase6.test.js` | Fase 6: usuarios, borradores, correo simulado y reportes (36 pruebas) |
+| `backend/tests/e2e/07-fase6.spec.js` | Fase 6: las 5 pantallas en el navegador contra la API real |
 | `backend/src/config/politicas.js` | Políticas de autorización por operación: `ROLES_INVALIDAR = ['ADMIN']` (pendiente de validar con el PO) |
 | `backend/src/utils/respuesta.js` | `AppError(codigo, mensaje, status)`, `ok(res, data, status)`, `asyncHandler(fn)` |
 | `backend/src/middleware/errores.js` | `noEncontrado` (404) y `manejadorErrores` → `{ok:false,error:{codigo,mensaje}}` |
@@ -96,7 +106,7 @@
 | `backend/src/controllers/dteController.js`, `routes/dte.js` | `POST /api/dte/01|03|05` (201), `POST /:id/invalidar|reintentar|consultar` (200), `GET /`, `GET /:id` (cualquier rol) |
 | `backend/requests.http` | Ejemplos de todos los endpoints (REST Client de VS Code) |
 | `frontend/index.html` | Solo HTML + CSS del prototipo (≈67 KB, 1019 líneas). Carga `js/mocks.js`, `api.js`, `pdf-data.js`, `app.js` en ese orden. Servido por Express en `/`. Mapa de vistas en *Frontend → Mapa del prototipo* |
-| `frontend/js/app.js` | Lógica de UI (globales para los `onclick` inline). F2: sesión, inventario y clientes; F3: venta y emisión 01/03; F4: transacciones, NC 05, anular, reintentar y bitácora contra `api.*`; C1: panel Contingencia. Panel gerencial (salvo el KPI de contingencia), usuarios y config del admin siguen fijos |
+| `frontend/js/app.js` | Lógica de UI (globales para los `onclick` inline). F2: sesión, inventario y clientes; F3: venta y emisión 01/03; F4: transacciones, NC 05, anular, reintentar y bitácora contra `api.*`; C1: panel Contingencia; Fase 6: borradores, correo simulado, panel gerencial, usuarios y config del emisor (bloque antes de `toggleSidebar`) |
 | `frontend/js/api.js` | Cliente HTTP: `API_CONFIG` (`BASE_URL:'/api'`, `USE_MOCK: false` desde I1), `ApiError`, `api.*` por endpoint, token en localStorage |
 | `frontend/js/mocks.js` | `MockApi.handle(method, path, query, body, headers)` → `{status, body}`: backend simulado en memoria con la forma exacta de `docs/API.md` (seed, firmador, respuestaMh, X-Simular) |
 | `frontend/js/pdf-data.js` | `var PDF_DATA` = PDF de ejemplo en base64 (226 KB); `downloadPdf()` solo lo usa en modo mock. Es la plantilla de `dte/pdf.js`. No abrir |
@@ -215,15 +225,15 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 | 449–478 | `#app-vendedor` sidebar (Nueva venta, Inventario, Clientes, Transacciones, Borradores, `.solo-admin` Panel gerencial / Administración) + topbar (`#v-title`, `#v-avatar`) | Badge "MH en línea" |
 | 480–529 | `#v-venta`: `#v-client-form`, `#v-prod-search`/`#v-catalog`, `#v-cart`, `#vt-01`/`#vt-03`, totales, pago, `.sim-mh` `#v-simular`, `#v-confirmar` | — |
 | 531–567 | `#v-historial` (Transacciones / Mis ventas): `#h-search` (local), `#h-tipo`, `#h-estado`, `#h-desde`, `#h-hasta`, `.sim-mh` `#h-simular`, `#h-tbody`, `#h-count` | — |
-| 569–580 | `#v-borradores` | 2 filas fijas en HTML |
+| — | `#v-borradores` (Fase 6: `#bo-tbody`, `#bo-count`; en Nueva venta `#v-borrador-btn`, `#v-borrador-info`) | — |
 | 583–605 | `#v-inventario` | — |
 | 607–646 | `#v-clientes` | — |
-| 651–755 | `#app-gerente`: `#g-dash` (KPI `#kpi-contingencia` real), `#g-ventas` (713), `#g-reportes` | KPIs, barras, dona, transacciones, ventas por vendedor fijos |
-| 758–923 | `#app-admin`: nav (Usuarios, Contingencia, Bitácora, Configuración), `#a-usuarios` (786; tarjeta "Cola de contingencia" con `#cq-badge` real), `#a-contingencia` (832: `#ct-tbody` con `.ct-chk`, `#ct-todos`, `#ct-motivo`, `#ct-simular`, `#ct-enviar`, `#ce-tbody`), `#a-bitacora` (871: `#b-accion` incl. CONTINGENCIA…), `#a-config` (899) | Usuarios, emisor y certificado fijos |
+| — | `#app-gerente` (Fase 6): filtros `#g-mes`/`#g-tipo`; `#g-dash` (`#kpi-netas`, `#kpi-docs`, `#kpi-ticket`, `#kpi-contingencia`, `#g-bars`, `#g-donut`, `#g-legend`), `#g-ventas` (`#gv-tbody`), `#g-reportes` (`#gr-vend-tbody`) | — |
+| — | `#app-admin`: nav (Usuarios, Contingencia, Bitácora, Configuración), `#a-usuarios` (Fase 6: `#u-tbody`, `#u-inactivos`, form `#u-usuario/#u-nombre/#u-rol/#u-password/#u-save`, `#u-log`; tarjeta "Cola de contingencia" `#cq-badge`), `#a-contingencia`, `#a-bitacora` (`#b-accion` incl. ELIMINAR, CORREO_SIMULADO), `#a-config` (Fase 6: `#cfg-emisor` solo lectura + tarjeta "Firmador simulado") | — |
 | 926–947 | `#dte-result-modal`: `#dr-title`, `#dr-estado`, `#dr-datos`, pestañas (`#dr-tab-json` cambia entre "JSON DTE" y "JSON evento"), `#dr-json`/`#dr-mh`, `#dr-acciones` | — |
 | 949–963 | `#anular-modal`: `#an-doc`, `#an-motivo`, `#an-ok` | — |
 | 965–990 | `#nc-modal`: `#nc-doc`, `#nc-receptor`, `#nc-tbody` (inputs `.nc-qty`), `#nc-sin-pendiente`, `#nc-subtotal/#nc-iva/#nc-total`, `#nc-ok` | — |
-| 992–1009 | `#email-modal` | — |
+| — | `#email-modal` (Fase 6: badge "Simulado", `#email-send` "Registrar envío simulado") | — |
 | 1011–1013 | `#scrim`, `#toast` | — |
 
 **`frontend/js/app.js`** — actualizado en C1
@@ -248,7 +258,7 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 | 790–834 | Bitácora: `bitacora`, `cargarBitacora`, `cargarBitacoraDiferido`, `resultadoBadge`, `renderBitacora`, `exportarBitacoraCsv` | — |
 | 836–888 | Utilidades DTE locales (no usadas por la API): `uuidGen`, `randCode`, `fmtFecha`, `EMISOR`, `numeroALetras`… | `EMISOR` ficticio |
 | 890–951 | `buildDteHtml()` (no se llama) | 2 ítems fijos |
-| 953–966 | Correo: `openEmailModal`, `closeEmailModal`, `sendEmail` (solo toast) | — |
+| — | Correo: `openEmailModal` (propone el correo del receptor), `closeEmailModal`, `sendEmail` → `POST /api/dte/:id/correo` (simulado) | — |
 | 968–999 | `buildPrintHtml()` (no se llama) | — |
 | 1001–1015 | `downloadPdf()` → `PDF_DATA` | PDF fijo |
 | 1017–1020 | Arranque: render inicial + restaurar sesión | — |
@@ -274,6 +284,32 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
   - Bitácora (panel de Administración): `GET /api/bitacora` con `accion`, `usuario` (con espera de 300 ms al escribir), `desde`, `hasta`, `limite` 500; columnas fecha, usuario, acción, entidad #id, resultado (badge), detalle. Export CSV en el cliente (BOM UTF-8, comillas escapadas, `bitacora-YYYY-MM-DD.csv`).
   - Verificado en Edge headless con mocks: 41 comprobaciones (filtros, badges, acciones por estado, detalle, NC con validaciones, stock devuelto y pendiente 40→35, documentoRelacionado, anular CCF con NC → 409, reintento → PROCESADO, anular sin motivo / contingencia / rechazo / ok → INVALIDADO y stock devuelto, bitácora con filtros y CSV, vendedor sin simulador) + capturas.
   - Pendiente (fuera de alcance): "Panel gerencial" (`#app-gerente`), Usuarios y Configuración del admin siguen con datos fijos; "Guardar borrador", el envío por correo y el PDF siguen simulados; anulación tipo 1/3 (con `codigoGeneracionR`) no está en la UI. Falta una prueba manual contra el backend real (`USE_MOCK = false`).
+
+- [x] **F6 — Pantallas que eran maqueta, Fase 6 (2026-11-20).** Backend + frontend + mocks + pruebas.
+  - Inventario previo: Borradores (2 filas fijas; "Guardar borrador" solo toast), correo ("Enviar" decía "enviado" sin enviar), panel gerencial (KPIs, gráficos, tablas y exportaciones fijos; solo el KPI de contingencia era real), usuarios (4 usuarios inventados, botones falsos), configuración (emisor ficticio distinto al de la BD, certificado "Habilitado" inventado, "Guardar" falso).
+  - Aprobado por el usuario y hecho, por funcionalidad:
+
+    | Pantalla | Ahora | Lo que sigue sin existir (y la UI lo dice) |
+    |---|---|---|
+    | Borradores | Tabla `borrador` + `/api/borradores` (por usuario). Guardar / actualizar, lista real, Continuar (avisa stock o productos/cliente que cambiaron), Eliminar; se borra al emitir (se conserva si MH rechaza) | No reservan stock |
+    | Correo | `POST /api/dte/:id/correo` **simulado**: solo bitácora `CORREO_SIMULADO`, responde `enviado:false`. Modal con badge "Simulado", aviso y botón "Registrar envío simulado"; toast "NO se envió ningún correo". Propone el correo del receptor. "Descargar PDF" sigue real | No hay SMTP |
+    | Panel gerencial | `GET /api/reportes/resumen` (ADMIN): ventas netas/brutas, NC, documentos, ticket, por estado/día/tipo/vendedor; filtros mes + tipo; tabla Ventas con `GET /api/dte` (+ `usuario`); CSV reales generados en el navegador | Exportar a PDF (botón quitado, aviso en la tarjeta) |
+    | Usuarios | `GET/POST/PUT /api/usuarios` (ADMIN): crear, editar nombre/rol/contraseña, activar/desactivar; tarjeta de actividad con `GET /api/bitacora` | Revocación inmediata de sesiones (el JWT vive hasta 8 h; el confirm lo advierte) |
+    | Configuración | Emisor real de `GET /api/emisor`, **solo lectura** (sin inputs ni "Guardar"); tarjeta "Firmador simulado — sin certificado" con badge "Simulado" | Edición del emisor; certificado y firma reales (el firmador simulado no se tocó) |
+
+    Además: el badge del POS "MH en línea" pasó a "MH simulado".
+  - Archivos backend: nuevos `services/{usuarios,borradores,reportes,correo}Service.js`, `controllers/{usuarios,borradores}Controller.js`, `routes/{usuarios,borradores,reportes}.js`; modificados `app.js` (3 rutas), `routes/dte.js` + `controllers/dteController.js` (`/:id/correo`), `services/dteConsultasService.js` (`usuario` en el listado), `db/01_schema.sql` (tabla `borrador`), `db/03_reset_demo.sql` (borra borradores; deja solo los 2 usuarios del seed con sus contraseñas). Pruebas: nuevo `tests/integration/fase6.test.js`, `tests/e2e/07-fase6.spec.js`; `autorizacion.test.js` (+11 rutas: 5 solo ADMIN, 6 de cualquier rol; la comprobación "sin efectos" mira solo la bitácora posterior a la foto), `consultas.test.js` (campo `usuario`).
+  - Archivos frontend: `index.html` (5 pantallas, modal de correo, opciones de bitácora, badge MH), `js/app.js` (bloque Fase 6; `swapPanel`, `enter`, sesión, `confirmSale`, correo, `toast` tipo `info`), `js/api.js` (`usuarios`, `borradores`, `reportes`, `dte.correo`), `js/mocks.js` (los mismos endpoints; login respeta `activo`).
+  - Decisiones: usuarios solo ADMIN; el login no se cambia; contraseña 8–72 bytes; duplicado → 400 como productos; quedarse sin ADMIN activo → 409 `ESTADO_INVALIDO`. Borradores: el de otro usuario → 404; sin validar el cliente del 03 (se valida al emitir). Reportes: vigente = PROCESADO + CONTINGENCIA; sumas en centavos; período máx. 366 días; el panel usa el mes completo. Correo de un DTE RECHAZADO → 409. El reset ahora restaura usuarios (antes "no tocaba usuarios") porque se pueden crear y editar desde la UI.
+  - Verificado: Jest 537/537 (24 suites: 110 unitarias, 427 integración), cobertura 96.72 / 84.86 / 98.34 / 98.45; e2e 21/21 (Edge) con capturas revisadas; mocks probados en Node (borrador 5.66 → 113, ajeno 404, correo `enviado:false`, reportes, usuarios).
+  - Pendiente: aplicar `db/01_schema.sql` a la BD de la demo (sin la tabla `borrador`, `/api/borradores` responde 500); revocar el JWT de un usuario desactivado; edición del emisor (si se aprueba: `PUT /api/emisor` con validaciones).
+
+- [x] **F7 — Evidencias KAN-23, Fase 7 (2026-11-20).** Documentación de seguridad, QA y riesgos con evidencia regenerada.
+  - Archivos: nuevos `docs/kan-23/{README,SEGURIDAD,QA,RIESGOS}.md`, `docs/kan-23/generado/*` (generados), `docs/kan-23/evidencia/*`, `backend/tests/tools/reporteKan23.js`; modificados `tests/integration/autorizacion.test.js` (+ `GET /api/contingencia/ejecuciones`, la única ruta protegida que faltaba: 40/40), `docs/PRUEBAS.md`, `docs/SEGURIDAD.md` (enlace), `PROGRESO.md`.
+  - Ejecución: huella de la BD de la demo → `npm ci` → `npm audit` (0) → Jest con cobertura y `--json` (539/539) → e2e (21/21) → 7 mutaciones de controles de acceso (6 detectadas; M6 `alg: none` equivalente porque `jsonwebtoken` ya lo rechaza) → huella (0 cambios) → barrido de secretos (sin fugas; las coincidencias de `DB_PASSWORD` son casuales y no se reproducen en la evidencia).
+  - Hallazgos nuevos (abiertos): **la app se conecta como `sa` con una contraseña local débil** (H-A2/H-A3); **un ADMIN degradado conserva permisos con su token hasta 8 h** (H-A1, agravado por la Fase 6); **la BD de la demo no tiene `config_tarea`, `ejecucion_tarea` ni `borrador`** (H-A9). Revisión de código: SQL 100 % parametrizado; ningún dato de la API llega a `innerHTML` sin `_h()`.
+  - Decisiones: los responsables de la matriz de riesgos van por rol (PO, BE, FE, QA, DBA), porque el nombre se asigna en el tablero KAN; escala 3×3 (nivel = P × I).
+  - Pendiente: acciones de `docs/kan-23/RIESGOS.md` § *Acciones recomendadas* (la 1, aplicar el esquema a la BD de la demo, antes de la demo).
 
 ## Integración
 
@@ -319,6 +355,8 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 
 ## Cambios de contrato
 
+- F6: nuevos `GET/POST/PUT /api/usuarios` (solo ADMIN), `GET/POST/PUT/DELETE /api/borradores` (cualquier rol, por usuario), `GET /api/reportes/resumen` (solo ADMIN) y `POST /api/dte/:id/correo` (cualquier rol, **simulado**: `enviado:false`). `GET /api/dte` agrega `usuario`. Bitácora: acciones `ELIMINAR` y `CORREO_SIMULADO`, entidad `borrador`. `ESTADO_INVALIDO` también para "debe quedar al menos un ADMIN activo". `db/03_reset_demo.sql` borra borradores y restaura los usuarios del seed.
+
 - C4: `GET/PUT /api/contingencia/programacion` y `/consultas` persisten la configuración (antes en memoria); `ultimaEjecucion`/`ultimaConsulta` salen de la BD y sobreviven a reinicios; nuevo resultado `OMITIDA`; `ERROR` con mensaje genérico; nuevo `GET /api/contingencia/ejecuciones?tarea=&limite=` (cualquier rol).
 - S2: autenticación también por cookie HttpOnly `pos_token` (+ `X-CSRF-Token` en escrituras; 403 `CSRF_INVALIDO`); login pone cookies y su JWT trae el claim `csrf`; nuevos `POST /api/auth/logout` y `GET /api/auth/sesion`; 429 `DEMASIADOS_INTENTOS` en login; 500 con mensaje genérico; 413 por cuerpo > 1 MB; `GET /api/health` agrega `demo` y su 503 ya no incluye el error del driver; CORS solo para `CORS_ORIGENES`.
 - S1: `POST /api/dte/:id/invalidar` pasa de "cualquier rol autenticado" a solo `ADMIN`; otro rol → 403 `SIN_PERMISO`.
@@ -349,6 +387,7 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 ## Pendientes
 
 - **Antes de la demo:** la BD local tiene los datos de las pruebas de C1 (DTE 3–10, 6 eventos de contingencia, bitácora y stock de P001, P002, P003, P005, P006 movidos). Ejecutar `sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql` para que los números de control empiecen en 001, como en `docs/DEMO.md`.
-- Fuera del MVP (simulado o fijo en la UI): panel gerencial, usuarios y configuración del admin, borradores, envío por correo, anulación tipo 1/3 en la UI, descuentos por línea en la UI.
+- ~~Fuera del MVP: panel gerencial, usuarios y configuración del admin, borradores, envío por correo~~ (Fase 6: reales, salvo el correo, que es simulado y lo dice; y el emisor, de solo lectura). Siguen fuera: anulación tipo 1/3 en la UI, descuentos por línea en la UI, exportar reportes a PDF, edición del emisor, SMTP real.
+- **Fase 6:** aplicar `db/01_schema.sql` a la BD de la demo (tabla `borrador`).
 - ~~`/api/health` en verde con `sa`~~ (hecho en B3).
 - Ninguno en backend. Opcional: reintentar invalidación más tarde si MH no responde (hoy el cliente simplemente repite la llamada).

@@ -2,10 +2,10 @@
 
 Dos niveles en `backend/tests/`:
 
-- **Jest + Supertest + Ajv** (backend): **469 pruebas en 23 suites** (110 unitarias en 7 suites, 359 de integración en 16), todas aprobadas. Cobertura del backend: **96.49 % sentencias, 84.85 % ramas, 98.36 % funciones, 98.33 % líneas** (tras la Fase 5).
-- **Playwright** (frontend contra la API real): **16 pruebas e2e en 6 archivos**, todas aprobadas.
+- **Jest + Supertest + Ajv** (backend): **539 pruebas en 24 suites** (110 unitarias en 7 suites, 429 de integración en 17), todas aprobadas. Cobertura del backend: **96.72 % sentencias, 84.86 % ramas, 98.34 % funciones, 98.45 % líneas** (Fase 7).
+- **Playwright** (frontend contra la API real): **21 pruebas e2e en 7 archivos**, todas aprobadas.
 
-Las cifras de Jest son de la Fase 5 (2026-11-20, sin carpeta de evidencia propia). La ejecución con evidencia completa (458 pruebas, misma fecha) está en [`docs/qa/2026-11-20/`](qa/2026-11-20/INFORME.md), con salidas, capturas y reportes. Las cifras anteriores que aparecen en `PROGRESO.md` (256, 281, 309, 326, 329, 346, 383) son históricas, de cada bloque.
+Las cifras son de la Fase 7 (hito **KAN-23**, 2026-11-20), con evidencia completa en [`docs/kan-23/`](kan-23/README.md): salidas, cobertura, reporte e2e con capturas, pruebas de mutación, matrices de trazabilidad y de autorización generadas desde los resultados (`tests/tools/reporteKan23.js`). La evidencia anterior (Fase 4, 458 pruebas) sigue en [`docs/qa/2026-11-20/`](qa/2026-11-20/INFORME.md), con salidas, capturas y reportes. Las cifras anteriores que aparecen en `PROGRESO.md` (256, 281, 309, 326, 329, 346, 383) son históricas, de cada bloque.
 
 ## Cómo correrlas
 
@@ -39,7 +39,7 @@ npm run test:e2e       # frontend con Playwright y Edge, ~45 s (levanta su propi
 | `tests/unit/contingencia.test.js` | Unitaria | `enContingencia` (tipoModelo/tipoOperacion 2) en 01/03/05 contra su esquema, builder del evento v4 y MH simulado del evento |
 | `tests/unit/middleware.test.js` | Unitaria | JWT (válido, ausente, otra firma, vencido, `alg: none`), roles, cookie + CSRF, errores 500 sin detalles internos, 413, configuración de seguridad |
 | `tests/integration/auth.test.js` | API + BD | Health, login, 401 en todas las rutas protegidas, 404 de API |
-| `tests/integration/autorizacion.test.js` | API + BD | **Matriz de autorización**: las 28 rutas protegidas sin token (401), token manipulado/sin firma/otro secreto (401), las 6 rutas de solo ADMIN con VENDEDOR por Bearer y por cookie+CSRF (403 sin efectos), las demás sin 403 para ningún rol, ADMIN autorizado |
+| `tests/integration/autorizacion.test.js` | API + BD | **Matriz de autorización**: las 40 rutas protegidas sin token (401), token manipulado/sin firma/otro secreto (401), las 11 rutas de solo ADMIN con VENDEDOR por Bearer y por cookie+CSRF (403 sin efectos), las demás sin 403 para ningún rol, ADMIN autorizado |
 | `tests/integration/seguridad.test.js` | API + BD | CORS por lista, cabeceras/CSP, cookie HttpOnly + CSRF, límite de intentos de login (429), 500/503 sin detalles, 413, credenciales demo solo en local |
 | `tests/integration/resetDemo.test.js` | API + BD | `db/03_reset_demo.sql` restaura los clientes del seed (editados, renombrados, desactivados) y borra los nuevos |
 | `tests/integration/pdf.test.js` | API + BD | `GET /api/dte/:id/pdf`: PDF real de 01/03/05, contingencia, 401/404 |
@@ -208,13 +208,24 @@ Requisitos tomados de las reglas DTE y convenciones de `CLAUDE.md` y del contrat
 
 | Requisito | Prueba(s) |
 |---|---|
-| Sesión en todas las rutas salvo health, login y logout | autorizacion «Sin sesión → 401…» (28 rutas), auth «Rutas protegidas», middleware |
+| Sesión en todas las rutas salvo health, login y logout | autorizacion «Sin sesión → 401…» (40 rutas, todas las registradas), auth «Rutas protegidas», middleware |
 | Un token manipulado, sin firma o de otro secreto no autentica; el rol sale solo del token | autorizacion «Token manipulado → 401» |
 | Solo ADMIN: productos (POST/PUT), invalidar, enviar contingencia, programación y cola de consultas (403 `SIN_PERMISO`, sin efectos, por Bearer y por cookie) | autorizacion «VENDEDOR en rutas de solo ADMIN…»; catalogos «VENDEDOR no puede crear ni editar»; invalidacion «autorización»; e2e 02-roles |
 | La UI muestra las acciones según el rol | e2e 02-roles (menú, Simular MH, inventario, "Anular") |
 | Cookie HttpOnly + CSRF en escrituras; CORS por lista; límite de login; errores sin detalles | seguridad (ver `docs/SEGURIDAD.md`), e2e 01-login |
 | Borrado lógico y `incluirInactivos` | catalogos «PUT parcial y borrado lógico» |
 | NIT/NRC normalizados a dígitos | catalogos «NIT/NRC con guiones…» |
+
+### Pantallas que eran maqueta (Fase 6)
+
+| Requisito | Prueba(s) |
+|---|---|
+| Usuarios: CRUD solo ADMIN, sin hash en las respuestas, login nuevo funciona, desactivado no entra, contraseña fuera de la bitácora | fase6 «Usuarios», autorizacion (5 rutas nuevas de solo ADMIN), e2e 07 «Usuarios» |
+| Nadie se desactiva ni se quita ADMIN a sí mismo; siempre queda un ADMIN activo (409) | fase6 «nadie se desactiva…», «no se puede dejar el sistema sin ADMIN» |
+| Borradores por usuario (el ajeno → 404), total estimado 01/03, productos desactivados fuera del estimado, se borran al emitir | fase6 «Borradores», e2e 07 «Borradores» |
+| Correo simulado: `enviado:false`, bitácora `CORREO_SIMULADO`, la UI nunca dice "enviado"; RECHAZADO → 409 | fase6 «Correo», e2e 07 «Correo» |
+| Reportes con los DTE reales (vigentes, NC, por día/tipo/vendedor, validación del período); solo ADMIN | fase6 «Reportes», e2e 07 «Panel gerencial» |
+| Configuración: emisor real en solo lectura; firmador identificado como simulado | e2e 07 «Configuración» |
 
 ## Defectos encontrados por la suite (corregidos)
 
@@ -223,6 +234,6 @@ Requisitos tomados de las reglas DTE y convenciones de `CLAUDE.md` y del contrat
 
 ## Fuera de alcance
 
-- Cobertura de código del frontend: no se mide (los flujos principales sí están cubiertos por la e2e). Pantallas sin e2e: panel gerencial, usuarios y configuración (simulados), Nota de crédito desde la UI (cubierta por la API en `dte05`), bitácora y su exportación a CSV.
+- Cobertura de código del frontend: no se mide (los flujos principales sí están cubiertos por la e2e). Pantallas sin e2e: Nota de crédito desde la UI (cubierta por la API en `dte05`), bitácora y su exportación a CSV, exportación CSV de "Ventas" del panel gerencial.
 - La e2e solo se ejecutó con Edge.
 - Firmador y MH son simulados por diseño: las pruebas demuestran el contrato de la simulación, no una integración con el MH real.

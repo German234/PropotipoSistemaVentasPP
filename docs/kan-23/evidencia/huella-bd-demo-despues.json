@@ -1,0 +1,54 @@
+{
+  "bd": "BatallonAtlacatl",
+  "fecha": "2026-11-21T03:56:18.444Z",
+  "tablas": {
+    "dbo.bitacora": {
+      "filas": 21,
+      "sha256": "4230c68dfab85a513bdcf31dc3af505aec588c7b35f30645a57391ffef4981f3"
+    },
+    "dbo.clientes": {
+      "filas": 4,
+      "sha256": "dce3d140c117c753661e9c83309067a929e198f240bff10090b10228ccdd4fe7"
+    },
+    "dbo.correlativos": {
+      "filas": 3,
+      "sha256": "270a0bf3e3fe5e96038823fa86d409d1681455c2259d794501cfbac70168531b"
+    },
+    "dbo.dte": {
+      "filas": 13,
+      "sha256": "ce6145b32709e96efe0bd7ef1bea81e2932c73528bdc40f615f8c09a1b12830f"
+    },
+    "dbo.dte_detalle": {
+      "filas": 13,
+      "sha256": "f59a3f5d75a0af86e20c5bc952d1c3e33660f7544443e0d06878fc10b5b1ceec"
+    },
+    "dbo.emisor": {
+      "filas": 1,
+      "sha256": "3c0652f45d4e7b28d07be4168dc948398122dbd227430c4359c879c77772f146"
+    },
+    "dbo.evento_contingencia": {
+      "filas": 1,
+      "sha256": "9d031f6fa3a93569789e1bbf8eef3fcf6f7586d3de7015187a13d1e64e35be2d"
+    },
+    "dbo.evento_contingencia_dte": {
+      "filas": 2,
+      "sha256": "9d0c1ee774ef538b882fb79fd27a7762027d6a401b70b138874cf849b580730a"
+    },
+    "dbo.evento_invalidacion": {
+      "filas": 1,
+      "sha256": "3b71e8de0db60403fde04c218ccb93efeff279929f90e894b8424e2dc4acaea0"
+    },
+    "dbo.mh_simulado_dte": {
+      "filas": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "dbo.productos": {
+      "filas": 10,
+      "sha256": "d84f369efd85d4c1ec975e9313691fb941c9f1eccb9e767c1f480e292c56687b"
+    },
+    "dbo.usuarios": {
+      "filas": 2,
+      "sha256": "1f63c35aeb71ba3e1e9bb6c077c7a290dcbca9b77588275353f5b7284eae5cd5"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 /**
  * Matriz de autorización (Fase 4): cada ruta protegida × {sin token, token manipulado, VENDEDOR, ADMIN}.
  * - Todas las rutas salvo health/login/logout → 401 sin token.
- * - Las 6 rutas de solo ADMIN → 403 SIN_PERMISO para VENDEDOR, sin efectos, por Bearer y por cookie (+CSRF).
+ * - Las rutas de solo ADMIN → 403 SIN_PERMISO para VENDEDOR, sin efectos, por Bearer y por cookie (+CSRF).
  * - Las demás rutas no deben responder 403 a ningún rol autenticado.
  */
 const jwt = require('jsonwebtoken');
@@ -10,10 +10,14 @@ const { prepararApi, cerrarBd } = require('../helpers/api');
 let t;
 let dteId;
 let clienteId; // cliente propio: la prueba no modifica los clientes del seed
+let usuarioId; // usuario propio (Fase 6): la prueba no modifica los usuarios del seed
+let borradorId;
 beforeAll(async () => {
   t = await prepararApi();
   dteId = (await t.emitir('01', { items: [{ productoId: t.prod.P001.id, cantidad: 1 }] })).body.data.id;
   clienteId = (await t.admin('post', '/api/clientes').send({ tipo: 'CONSUMIDOR', nombre: 'Autz Cliente QA' })).body.data.id;
+  usuarioId = (await t.admin('post', '/api/usuarios').send({ usuario: 'autz.qa', nombre: 'Autz QA', rol: 'VENDEDOR', password: 'autzqa1234' })).body.data.id;
+  borradorId = (await t.vendedor('post', '/api/borradores').send({ tipoDte: '01', items: [{ productoId: t.prod.P001.id, cantidad: 1 }] })).body.data.id;
 });
 afterAll(cerrarBd);
 
@@ -26,6 +30,11 @@ const SOLO_ADMIN = [
   ['post', '/api/contingencia', { motivo: 'Prueba de autorización' }],
   ['put', '/api/contingencia/programacion', { activo: false, hora: '01:00' }],
   ['put', '/api/contingencia/consultas', { activo: false, intervaloSeg: 999 }],
+  ['get', '/api/usuarios'],
+  ['get', () => `/api/usuarios/${usuarioId}`],
+  ['post', '/api/usuarios', { usuario: 'autz.nuevo', nombre: 'Autz Nuevo', rol: 'VENDEDOR', password: 'autznuevo1' }],
+  ['put', () => `/api/usuarios/${usuarioId}`, { nombre: 'Autz QA editado' }],
+  ['get', '/api/reportes/resumen'],
 ];
 const CUALQUIER_ROL = [
   ['get', '/api/auth/sesion'],
@@ -48,8 +57,15 @@ const CUALQUIER_ROL = [
   ['get', '/api/contingencia'],
   ['get', '/api/contingencia/programacion'],
   ['get', '/api/contingencia/consultas'],
+  ['get', '/api/contingencia/ejecuciones'],
   ['get', '/api/contingencia/999999'],
   ['get', '/api/bitacora'],
+  ['get', '/api/borradores'],
+  ['post', '/api/borradores', { tipoDte: '01', items: [{ productoId: 1, cantidad: 1 }] }],
+  ['get', () => `/api/borradores/${borradorId}`],
+  ['put', () => `/api/borradores/${borradorId}`, { tipoDte: '01', items: [{ productoId: 1, cantidad: 2 }] }],
+  ['delete', () => `/api/borradores/${borradorId}`],
+  ['post', () => `/api/dte/${ID()}/correo`, { correo: 'autz@correo.com' }],
 ];
 const ruta = (r) => (typeof r === 'function' ? r() : r);
 const nombre = ([m, r]) => `${m.toUpperCase()} ${typeof r === 'function' ? r.toString().match(/`(.+)`/)[1] : r}`;
@@ -104,10 +120,15 @@ describe('VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos', () =
       programacion: (({ activo, hora }) => ({ activo, hora }))(await g('/api/contingencia/programacion')),
       consultas: (({ activo, intervaloSeg }) => ({ activo, intervaloSeg }))(await g('/api/contingencia/consultas')),
       bitacora: (await g('/api/bitacora?limite=1000')).length,
+      usuarios: await g('/api/usuarios?incluirInactivos=1'),
     };
   }
   let antes;
-  beforeAll(async () => { antes = await estado(); });
+  let ultimaBitacora; // solo cuenta lo registrado después de la foto (el beforeAll del archivo crea un borrador como VENDEDOR)
+  beforeAll(async () => {
+    antes = await estado();
+    ultimaBitacora = Math.max(0, ...(await t.admin('get', '/api/bitacora?limite=1000')).body.data.map((x) => x.id));
+  });
 
   test.each(SOLO_ADMIN.map((x) => [nombre(x), x]))('Bearer · %s', async (_, [m, r, body]) => {
     const res = await t.vendedor(m, ruta(r)).send(body);
@@ -130,7 +151,7 @@ describe('VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos', () =
     const logins = (await t.admin('get', '/api/bitacora').query({ accion: 'LOGIN', limite: 1000 })).body.data.length;
     expect({ ...despues, bitacora: undefined }).toEqual({ ...antes, bitacora: undefined });
     expect(despues.bitacora - antes.bitacora).toBeLessThanOrEqual(logins);
-    const noLogin = (await t.admin('get', '/api/bitacora?limite=1000')).body.data.filter((b) => b.accion !== 'LOGIN');
+    const noLogin = (await t.admin('get', '/api/bitacora?limite=1000')).body.data.filter((b) => b.accion !== 'LOGIN' && b.id > ultimaBitacora);
     expect(noLogin.some((b) => b.usuario === 'vendedor' && b.accion !== 'LOGIN_FALLIDO')).toBe(false);
   });
 });

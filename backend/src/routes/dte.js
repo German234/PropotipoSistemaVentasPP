@@ -14,5 +14,6 @@ router.get('/:id/pdf', asyncHandler(c.pdf));
 router.post('/:id/invalidar', requireRol(...ROLES_INVALIDAR), asyncHandler(c.invalidar));
 router.post('/:id/reintentar', asyncHandler(c.reintentar));
 router.post('/:id/consultar', asyncHandler(c.consultar));
+router.post('/:id/correo', asyncHandler(c.enviarCorreo));
 
 module.exports = router;

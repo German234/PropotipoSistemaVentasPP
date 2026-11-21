@@ -1,5 +1,7 @@
 # Seguridad (Fase 3)
 
+> Estado consolidado (controles verificados y pendientes, autorización por rol, hallazgos corregidos y abiertos, riesgo residual): [`docs/kan-23/SEGURIDAD.md`](kan-23/SEGURIDAD.md) (hito KAN-23, Fase 7). Este archivo conserva el detalle técnico de cada control de la Fase 3.
+
 Endurecimiento del POS académico. Cada cambio indica el riesgo que corrige y la prueba que lo verifica.
 Pruebas: `cd backend && npm test` (383 en verde al cerrar la fase). Las de esta fase están en
 `tests/integration/seguridad.test.js` y `tests/unit/middleware.test.js`.

@@ -24,6 +24,9 @@ app.use('/api/catalogos', require('./routes/catalogos'));
 app.use('/api/dte', require('./routes/dte'));
 app.use('/api/contingencia', require('./routes/contingencia'));
 app.use('/api/bitacora', require('./routes/bitacora'));
+app.use('/api/usuarios', require('./routes/usuarios'));
+app.use('/api/borradores', require('./routes/borradores'));
+app.use('/api/reportes', require('./routes/reportes'));
 
 // Rutas /api no definidas → 404 con formato estándar
 app.use('/api', noEncontrado);

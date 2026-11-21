@@ -27,7 +27,7 @@ describe('GET /api/dte', () => {
     expect(r.body.data.map((d) => d.id)).toEqual([ids.n1, ids.c1, ids.f3, ids.f2, ids.f1]);
     expect(Object.keys(r.body.data[0]).sort()).toEqual([
       'clienteId', 'codigoGeneracion', 'dteRelacionadoId', 'estado', 'fechaEmision', 'id', 'numeroControl', 'receptor',
-      'selloRecibido', 'tipoDte', 'total',
+      'selloRecibido', 'tipoDte', 'total', 'usuario',
     ]);
     expect(r.body.data.find((d) => d.id === ids.f3).receptor).toBe('Consumidor final');
     expect(r.body.data.find((d) => d.id === ids.n1).dteRelacionadoId).toBe(ids.c1);
