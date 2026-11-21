@@ -33,13 +33,15 @@ sqlcmd -S localhost -E -C -f 65001 -i db/02_seed.sql
 - `-f 65001` lee los archivos como UTF-8 (sin esto los acentos se guardan mal).
 - `-C` confía en el certificado del servidor local.
 
+**Al actualizar el proyecto**, vuelve a correr `db/01_schema.sql` sobre tu BD: agrega las tablas y columnas nuevas sin tocar los datos (p. ej. `config_tarea` y `ejecucion_tarea` de la Fase 5). Si faltan, el servidor arranca igual pero avisa que no puede leer la configuración del lote y la cola de consultas.
+
 El seed crea dos usuarios, el emisor, 10 productos, 4 clientes (2 consumidores y 2 contribuyentes) y los correlativos 01/03/05 en 0.
 
 ### 2. Configuración del backend (`.env`)
 
 ```bash
 cd backend
-npm install
+npm ci                      # o npm install
 copy .env.example .env      # en macOS/Linux: cp .env.example .env
 ```
 
@@ -53,12 +55,16 @@ Edita `backend/.env`:
 | `DB_USER` / `DB_PASSWORD` | Usuario SQL y su contraseña |
 | `DB_ENCRYPT` | `true` o `false` según tu servidor (`false` suele bastar en local) |
 | `DB_TRUST_CERT` | `true` en local (certificado autofirmado) |
-| `JWT_SECRET` | Cualquier texto largo y aleatorio (el servidor no arranca sin él) |
+| `JWT_SECRET` | Texto aleatorio de 32+ caracteres: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`. Sin él el servidor no arranca; si es débil avisa (y con `NODE_ENV=production` no arranca) |
 | `PORT` | Puerto de la aplicación, por defecto `3000` |
 | `CONTINGENCIA_LOTE_HORA` | Hora (`HH:mm`) del lote automático de contingencia del cierre del día, por defecto `23:55` |
 | `CONTINGENCIA_LOTE_ACTIVO` | `1` (por defecto) o `0` para desactivar el lote automático |
 | `CONSULTA_MH_INTERVALO_SEG` | Cada cuántos segundos la cola de consultas pregunta a MH por **un** DTE en contingencia (10–3600, por defecto `60`) |
 | `CONSULTA_MH_ACTIVO` | `1` (por defecto) o `0` para desactivar la cola de consultas |
+
+Las cuatro variables de contingencia son solo el **valor inicial**: la primera vez se guardan en SQL Server (`dbo.config_tarea`) y desde entonces manda lo que se configure en el panel *Contingencia* (o por `PUT /api/contingencia/programacion` y `/consultas`), también después de reiniciar el servidor. `db/03_reset_demo.sql` vuelve a los valores del `.env`.
+
+Variables de seguridad (CORS, cookies, límite de inicios de sesión, credenciales de prueba en el login): ver `backend/.env.example` y [docs/SEGURIDAD.md](docs/SEGURIDAD.md). Los valores por defecto sirven para el entorno local.
 
 ### 3. Ejecutar
 
@@ -74,7 +80,9 @@ Abre **http://localhost:3000**. Para comprobar la conexión, abre http://localho
 | Usuario | Contraseña | Rol |
 |---|---|---|
 | `admin` | `admin123` | ADMIN: todo, más productos, simulador de MH, panel gerencial y administración |
-| `vendedor` | `vendedor123` | VENDEDOR: ventas, clientes y transacciones |
+| `vendedor` | `vendedor123` | VENDEDOR: ventas, clientes y transacciones (no anula DTE ni ve contingencia ni administración) |
+
+La pantalla de login los muestra solo en el entorno local (`localhost`, sin `NODE_ENV=production`). En un despliegue real cambia estas contraseñas. Tras 5 intentos fallidos el login de ese usuario se bloquea 15 minutos.
 
 ## Uso rápido
 
@@ -88,7 +96,7 @@ El guion de la demo de 5 minutos está en [docs/DEMO.md](docs/DEMO.md).
 
 ## Reiniciar los datos de la demo
 
-Borra todos los DTE, los eventos y la bitácora, pone los correlativos en 0 y restaura productos y clientes del seed. No toca usuarios ni emisor.
+Borra todos los DTE, los eventos, la bitácora y el registro de ejecuciones de las tareas programadas, pone los correlativos en 0, restaura productos y clientes del seed y devuelve la configuración del lote automático y de la cola de consultas a los valores del `.env`. No toca usuarios ni emisor.
 
 ```bash
 sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql
@@ -98,12 +106,16 @@ sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql
 
 ```bash
 cd backend
-npm test               # 309 pruebas: unitarias + integración (~25 s)
+npm ci                 # dependencias exactas de package-lock.json
+npm test               # 469 pruebas en 23 suites: unitarias + integración (~50 s)
 npm run test:unit      # sin BD
 npm run test:coverage  # reporte en backend/coverage/index.html
+npm run test:e2e       # 16 pruebas del frontend con Playwright y Microsoft Edge (~45 s)
 ```
 
-Las pruebas de integración usan una BD aparte, `BatallonAtlacatl_Test`, que se crea y siembra sola con los scripts de `db/` (requiere SQL Server y `backend/.env`; nunca tocan la BD de la demo). Detalle y matriz de requisitos → pruebas en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+Las pruebas de integración y las e2e usan una BD aparte, `BatallonAtlacatl_Test`, que se crea y siembra sola con los scripts de `db/` (requiere SQL Server, `backend/.env` y permiso para `CREATE DATABASE`); nunca tocan la BD de la demo. La e2e levanta su propio servidor en el puerto 3099 y usa el Edge instalado (sin Edge: `E2E_CHANNEL=chrome`). No corras `npm test` y `npm run test:e2e` a la vez.
+
+Último resultado (Fase 5, 2026-11-20): 469/469 y 16/16 aprobadas; cobertura del backend 96.49 % sentencias, 84.85 % ramas, 98.36 % funciones y 98.33 % líneas; BD de la demo sin cambios. Evidencia completa de QA (ejecución de 458 pruebas) en [docs/qa/2026-11-20/](docs/qa/2026-11-20/INFORME.md). Detalle y matriz de requisitos → pruebas en [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ## Modo sin backend (mocks)
 

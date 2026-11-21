@@ -1,0 +1,16 @@
+$ node tests/tools/huellaBdDemo.js --comparar huella-bd-demo-antes.json   (2026-11-20T21:00:09-06:00)
+IGUAL   dbo.bitacora                             filas 21 → 21
+IGUAL   dbo.clientes                             filas 4 → 4
+IGUAL   dbo.correlativos                         filas 3 → 3
+IGUAL   dbo.dte                                  filas 13 → 13
+IGUAL   dbo.dte_detalle                          filas 13 → 13
+IGUAL   dbo.emisor                               filas 1 → 1
+IGUAL   dbo.evento_contingencia                  filas 1 → 1
+IGUAL   dbo.evento_contingencia_dte              filas 2 → 2
+IGUAL   dbo.evento_invalidacion                  filas 1 → 1
+IGUAL   dbo.mh_simulado_dte                      filas 0 → 0
+IGUAL   dbo.productos                            filas 10 → 10
+IGUAL   dbo.usuarios                             filas 2 → 2
+
+BD BatallonAtlacatl: 12 tablas, 0 con cambios (antes 2026-11-21T02:41:25.965Z, ahora 2026-11-21T03:00:10.412Z)
+exit=0

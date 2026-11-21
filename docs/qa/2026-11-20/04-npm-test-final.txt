@@ -1,0 +1,596 @@
+$ npm test   (2026-11-20T20:52:46-06:00)
+
+> pos-dte-backend@0.1.0 test
+> jest --runInBand --verbose
+
+PASS integration tests/integration/seguridad.test.js (5.237 s)
+  CORS con orígenes permitidos
+    √ origen local por defecto → Access-Control-Allow-Origin y credenciales (10 ms)
+    √ origen no permitido → sin cabeceras CORS (el navegador bloquea la respuesta) (6 ms)
+    √ preflight de un origen configurado en CORS_ORIGENES permite X-CSRF-Token (4 ms)
+    √ peticiones sin Origin (mismo origen, curl) siguen funcionando (6 ms)
+  Cabeceras HTTP de seguridad
+    √ la página y la API llevan CSP, nosniff, anti-framing y referrer; sin X-Powered-By (19 ms)
+    √ la API responde Cache-Control: no-store (7 ms)
+  Sesión del navegador: cookie HttpOnly + CSRF
+    √ login pone pos_token HttpOnly + SameSite=Strict y pos_csrf legible (1 ms)
+    √ COOKIE_SECURE=1 → cookies con atributo Secure (78 ms)
+    √ GET /api/auth/sesion con la cookie devuelve el usuario; sin cookie → 401 (8 ms)
+    √ cookie + POST sin X-CSRF-Token → 403 CSRF_INVALIDO y no crea nada (16 ms)
+    √ cookie + POST con un X-CSRF-Token ajeno → 403 (5 ms)
+    √ cookie + POST con el X-CSRF-Token correcto → 201 (17 ms)
+    √ Bearer sigue funcionando sin CSRF (clientes de API y pruebas) (17 ms)
+    √ POST /api/auth/logout borra ambas cookies (5 ms)
+  Límite de intentos de inicio de sesión
+    √ 5 fallos → el 6.º intento responde 429 DEMASIADOS_INTENTOS con Retry-After, aunque la clave sea correcta (374 ms)
+    √ el bloqueo es por usuario: otro usuario desde la misma IP puede entrar (432 ms)
+    √ un login correcto reinicia el contador del usuario (757 ms)
+    √ límite por IP: probar muchos usuarios distintos desde la misma IP también se bloquea (738 ms)
+    √ la validación (400) no cuenta como intento fallido (126 ms)
+    √ LOGIN_MAX_INTENTOS configurable (217 ms)
+  Errores sin detalles internos
+    √ excepción no controlada (p. ej. SQL) → 500 genérico, sin el mensaje original (4 ms)
+    √ health con la BD caída → 503 DB_NO_DISPONIBLE sin el error del driver (4 ms)
+    √ cuerpo de más de 1 MB → 413 con formato estándar (10 ms)
+  Credenciales de demostración
+    √ entorno local (localhost, no producción) → /api/health las devuelve y se sirven los mocks (14 ms)
+    √ DEMO_CREDENCIALES=0 → demo null, mocks vacíos y la página no trae credenciales (12 ms)
+    √ NODE_ENV=production → demo null, mocks vacíos y la página no trae credenciales (11 ms)
+    √ dominio distinto de localhost → demo null, mocks vacíos y la página no trae credenciales (10 ms)
+
+PASS integration tests/integration/dte01.factura.test.js
+  01 Factura · emisión exitosa (X-Simular: ok)
+    √ responde 201 con la respuesta de emisión del contrato (1 ms)
+    √ numeroControl DTE-01-M001P001-{15 dígitos} empezando en 1 y codigoGeneracion UUID v4 en MAYÚSCULAS (1 ms)
+    √ firmador OK y respuesta MH PROCESADO con sello de 40 caracteres (1 ms)
+    √ el payload firmado es el JSON DTE guardado (15 ms)
+    √ jsonDte cumple fe-f-v2.json, sin receptor y con IVA incluido (83 ms)
+    √ descuenta el stock (9 ms)
+    √ registra EMISION en la bitácora (32 ms)
+  01 Factura · variantes
+    √ con receptor, varias líneas y descuento CON IVA: 9.16 → "NUEVE 16/100 USD" (36 ms)
+    √ a crédito (condicionOperacion 2): pagos = null (29 ms)
+    √ un mismo producto repetido se suma en una línea (28 ms)
+    √ los números de control son consecutivos por tipo (13 ms)
+    √ concurrencia: 8 emisiones en paralelo obtienen 8 números de control distintos (161 ms)
+  01 Factura · errores
+    √ sin items → 400 VALIDACION (6 ms)
+    √ cantidad 0 o decimal → 400 (9 ms)
+    √ condicionOperacion fuera de 1/2/3 → 400 (5 ms)
+    √ producto inexistente → 404 NO_ENCONTRADO (11 ms)
+    √ cliente inexistente → 404 (10 ms)
+    √ descuento mayor que la línea → 400 (10 ms)
+    √ stock insuficiente → 409 STOCK_INSUFICIENTE y no consume correlativo ni stock (66 ms)
+    √ stock insuficiente se valida también en contingencia y rechazo (17 ms)
+    √ producto inactivo → 400 (35 ms)
+    √ sin token → 401 (3 ms)
+
+PASS integration tests/integration/autorizacion.test.js
+  Sin sesión → 401 en todas las rutas protegidas
+    √ POST /api/productos (6 ms)
+    √ PUT /api/productos/${t.prod.P001.id} (3 ms)
+    √ POST /api/dte/${ID()}/invalidar (2 ms)
+    √ POST /api/contingencia (2 ms)
+    √ PUT /api/contingencia/programacion (2 ms)
+    √ PUT /api/contingencia/consultas (2 ms)
+    √ GET /api/auth/sesion (2 ms)
+    √ GET /api/productos (2 ms)
+    √ GET /api/productos/${t.prod.P001.id} (2 ms)
+    √ GET /api/clientes (3 ms)
+    √ GET /api/clientes/${clienteId} (2 ms)
+    √ POST /api/clientes (2 ms)
+    √ PUT /api/clientes/${clienteId} (2 ms)
+    √ GET /api/emisor (3 ms)
+    √ GET /api/catalogos (3 ms)
+    √ GET /api/dte (2 ms)
+    √ POST /api/dte/01 (3 ms)
+    √ POST /api/dte/03 (2 ms)
+    √ POST /api/dte/05 (2 ms)
+    √ GET /api/dte/${ID()} (2 ms)
+    √ GET /api/dte/${ID()}/pdf (2 ms)
+    √ POST /api/dte/${ID()}/reintentar (2 ms)
+    √ POST /api/dte/${ID()}/consultar (2 ms)
+    √ GET /api/contingencia (2 ms)
+    √ GET /api/contingencia/programacion (3 ms)
+    √ GET /api/contingencia/consultas (2 ms)
+    √ GET /api/contingencia/999999 (2 ms)
+    √ GET /api/bitacora (2 ms)
+    √ las únicas rutas públicas son health, login y logout (10 ms)
+  Token manipulado → 401
+    √ VENDEDOR que cambia su rol a ADMIN en el payload (firma inválida) no pasa (2 ms)
+    √ token sin firma (alg none) con rol ADMIN → 401 (3 ms)
+    √ token firmado con otro secreto → 401 (3 ms)
+    √ el rol enviado en el cuerpo se ignora: solo cuenta el del token (3 ms)
+  VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos
+    √ Bearer · POST /api/productos (3 ms)
+    √ Bearer · PUT /api/productos/${t.prod.P001.id} (2 ms)
+    √ Bearer · POST /api/dte/${ID()}/invalidar (2 ms)
+    √ Bearer · POST /api/contingencia (3 ms)
+    √ Bearer · PUT /api/contingencia/programacion (3 ms)
+    √ Bearer · PUT /api/contingencia/consultas (5 ms)
+    √ cookie + CSRF válido · POST /api/productos (117 ms)
+    √ cookie + CSRF válido · PUT /api/productos/${t.prod.P001.id} (154 ms)
+    √ cookie + CSRF válido · POST /api/dte/${ID()}/invalidar (158 ms)
+    √ cookie + CSRF válido · POST /api/contingencia (90 ms)
+    √ cookie + CSRF válido · PUT /api/contingencia/programacion (196 ms)
+    √ cookie + CSRF válido · PUT /api/contingencia/consultas (151 ms)
+    √ ningún intento denegado cambió productos, DTE, contingencia, configuración ni bitácora (36 ms)
+  Rutas de cualquier rol: ningún usuario autenticado recibe 403
+    √ VENDEDOR · GET /api/auth/sesion (3 ms)
+    √ VENDEDOR · GET /api/productos (3 ms)
+    √ VENDEDOR · GET /api/productos/${t.prod.P001.id} (4 ms)
+    √ VENDEDOR · GET /api/clientes (4 ms)
+    √ VENDEDOR · GET /api/clientes/${clienteId} (4 ms)
+    √ VENDEDOR · POST /api/clientes (76 ms)
+    √ VENDEDOR · PUT /api/clientes/${clienteId} (125 ms)
+    √ VENDEDOR · GET /api/emisor (6 ms)
+    √ VENDEDOR · GET /api/catalogos (3 ms)
+    √ VENDEDOR · GET /api/dte (4 ms)
+    √ VENDEDOR · POST /api/dte/01 (31 ms)
+    √ VENDEDOR · POST /api/dte/03 (3 ms)
+    √ VENDEDOR · POST /api/dte/05 (2 ms)
+    √ VENDEDOR · GET /api/dte/${ID()} (8 ms)
+    √ VENDEDOR · GET /api/dte/${ID()}/pdf (353 ms)
+    √ VENDEDOR · POST /api/dte/${ID()}/reintentar (7 ms)
+    √ VENDEDOR · POST /api/dte/${ID()}/consultar (6 ms)
+    √ VENDEDOR · GET /api/contingencia (5 ms)
+    √ VENDEDOR · GET /api/contingencia/programacion (7 ms)
+    √ VENDEDOR · GET /api/contingencia/consultas (6 ms)
+    √ VENDEDOR · GET /api/contingencia/999999 (5 ms)
+    √ VENDEDOR · GET /api/bitacora (5 ms)
+  ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta)
+    √ POST /api/productos (8 ms)
+    √ PUT /api/productos/${t.prod.P001.id} (10 ms)
+    √ POST /api/dte/${ID()}/invalidar (13 ms)
+    √ POST /api/contingencia (9 ms)
+    √ PUT /api/contingencia/programacion (7 ms)
+    √ PUT /api/contingencia/consultas (8 ms)
+
+PASS integration tests/integration/resetDemo.test.js
+  √ restaura los datos de los clientes del seed editados, renombrados o desactivados, y borra los nuevos (441 ms)
+
+PASS integration tests/integration/pdf.test.js
+  GET /api/dte/:id/pdf
+    √ f1 → application/pdf descargable (346 ms)
+    √ f2 → application/pdf descargable (338 ms)
+    √ c1 → application/pdf descargable (339 ms)
+    √ n1 → application/pdf descargable (322 ms)
+    √ sin token → 401 (4 ms)
+    √ inexistente → 404 JSON estándar (5 ms)
+
+PASS integration tests/integration/consultaMh.test.js
+  X-Simular: timeout (MH recibió, pero la respuesta no llegó)
+    √ para el POS es una contingencia: CONTINGENCIA, sin sello, JSON en modelo diferido, stock descontado (98 ms)
+    √ invalidar con timeout → 503 MH_NO_DISPONIBLE (como contingencia) (218 ms)
+  POST /api/dte/:id/consultar
+    √ DTE que MH sí recibió → ENCONTRADO: PROCESADO con sello, JSON y firma de modelo previo, stock igual (250 ms)
+    √ contingencia real → NO_ENCONTRADO: sigue en CONTINGENCIA y cuenta la consulta (172 ms)
+    √ MH tampoco responde a la consulta (X-Simular contingencia/timeout) → SIN_RESPUESTA, aunque MH lo tenga (56 ms)
+    √ DTE que no está en CONTINGENCIA → 409; inexistente → 404; X-Simular inválido → 400; sin token → 401 (29 ms)
+  Reenvío de un DTE que MH ya tenía
+    √ reintentar → PROCESADO con el sello ORIGINAL (MH no lo duplica) y JSON de modelo previo (55 ms)
+    √ reintentar con timeout otra vez → sigue en CONTINGENCIA; luego la consulta lo encuentra (74 ms)
+    √ lote de contingencia con un DTE que MH ya tenía → PROCESADO con su sello original (105 ms)
+  Cola: un DTE por turno (consultarSiguiente)
+    √ GET /api/contingencia/consultas: cola en orden (nunca consultados primero, por id) (6 ms)
+    √ cada turno consulta solo UN documento, en orden round-robin (61 ms)
+    √ los turnos automáticos sin novedad no llenan la bitácora; el ENCONTRADO sí queda (10 ms)
+    √ MH sin respuesta en un turno → SIN_RESPUESTA y el DTE pasa al final de la cola (17 ms)
+    √ sin DTE en contingencia → el turno no hace nada (null) (23 ms)
+  PUT /api/contingencia/consultas
+    √ VENDEDOR → 403; GET cualquier rol (8 ms)
+    √ {} → 400 VALIDACION (3 ms)
+    √ {"intervaloSeg":5} → 400 VALIDACION (3 ms)
+    √ {"intervaloSeg":3601} → 400 VALIDACION (2 ms)
+    √ {"intervaloSeg":12.5} → 400 VALIDACION (3 ms)
+    √ {"intervaloSeg":"30"} → 400 VALIDACION (2 ms)
+    √ {"activo":1} → 400 VALIDACION (3 ms)
+    √ cambia intervalo y activo; queda en bitácora (20 ms)
+
+PASS integration tests/integration/eventoContingencia.test.js
+  DTE emitido en contingencia
+    √ 01: JSON con tipoModelo 2, tipoOperacion 2, tipoContingencia 1, firmado así y válido contra el esquema (113 ms)
+    √ 03: JSON con tipoModelo 2, tipoOperacion 2, tipoContingencia 1, firmado así y válido contra el esquema (156 ms)
+    √ 05: NC en contingencia también pasa a modelo diferido y cumple el esquema (204 ms)
+    √ un DTE procesado normalmente sigue con tipoModelo 1 y tipoOperacion 1 (91 ms)
+  POST /api/contingencia · validaciones
+    √ VENDEDOR → 403 SIN_PERMISO (4 ms)
+    √ DTE que no está en CONTINGENCIA → 409 ESTADO_INVALIDO (89 ms)
+    √ DTE inexistente → 404 (7 ms)
+    √ dteIds vacío o no numérico → 400 (5 ms)
+    √ motivo de más de 500 caracteres → 400 (3 ms)
+    √ X-Simular inválido → 400 (3 ms)
+  Evento sin respuesta de MH y evento rechazado
+    √ MH no responde → 503 MH_NO_DISPONIBLE, no se guarda el evento, DTE sigue en CONTINGENCIA, bitácora SIN_RESPUESTA (229 ms)
+    √ evento rechazado → 201 ok:true, estado RECHAZADO sin sello; los DTE siguen en CONTINGENCIA (118 ms)
+  Evento aceptado: transmite todos los DTE en contingencia
+    √ sin dteIds incluye todos los DTE en CONTINGENCIA (01, 03 y 05) (1 ms)
+    √ evento PROCESADO con sello propio y código de generación UUID en mayúsculas
+    √ jsonEvento cumple contingencia-schema-v4.json y lista cada DTE en detalleDTE (1 ms)
+    √ cada DTE quedó PROCESADO con su sello, conservando codigoGeneracion y numeroControl (43 ms)
+    √ bitácora: CONTINGENCIA PROCESADO y un REINTENTO por DTE con el código del evento (33 ms)
+    √ sin DTE en contingencia → 409 ESTADO_INVALIDO (6 ms)
+    √ los DTE transmitidos ya se pueden invalidar (110 ms)
+  Evento con dteIds seleccionados
+    √ solo transmite los indicados (ids repetidos se cuentan una vez) (266 ms)
+  GET /api/contingencia
+    √ lista los eventos guardados (procesados y rechazados), más reciente primero (13 ms)
+    √ GET /:id devuelve el evento con jsonEvento, firmador, respuestaMh y el estado actual de sus DTE (41 ms)
+    √ evento inexistente → 404; id inválido → 400 (9 ms)
+    √ sin token → 401 (3 ms)
+
+PASS integration tests/integration/invalidacion.test.js
+  Invalidar una Factura 01
+    √ 200 con DTE INVALIDADO, evento PROCESADO y sello propio (1 ms)
+    √ jsonEvento cumple invalidacion-schema-v3.json y referencia al DTE (26 ms)
+    √ devuelve el stock (22 ms)
+    √ GET /api/dte/:id muestra el evento de invalidación (9 ms)
+    √ bitácora INVALIDACION PROCESADO (13 ms)
+    √ invalidar otra vez → 409 ESTADO_INVALIDO (8 ms)
+  Invalidación con MH rechazando o sin responder
+    √ evento rechazado → ok:true, estadoEvento RECHAZADO, DTE sigue PROCESADO y stock sin cambios (36 ms)
+    √ MH no responde → 503 MH_NO_DISPONIBLE; DTE sigue PROCESADO; bitácora SIN_RESPUESTA (159 ms)
+    √ luego se puede reintentar la invalidación con éxito (14 ms)
+  Invalidar un CCF con Nota de crédito
+    √ CCF con NC vigente → 409 ESTADO_INVALIDO (16 ms)
+    √ invalidar la NC: el evento cumple el esquema (tipoDte 05) y vuelve a sacar el stock (30 ms)
+    √ sin NC vigente el CCF se invalida y devuelve su stock (27 ms)
+    √ no se puede emitir una NC sobre un CCF INVALIDADO (409) (7 ms)
+  Invalidación · tipos de anulación y validaciones
+    √ sin motivo → 400 (3 ms)
+    √ motivo de más de 200 caracteres → 400 (2 ms)
+    √ tipoAnulacion fuera de 1/2/3 → 400 (3 ms)
+    √ tipoAnulacion 1 sin codigoGeneracionR → 400 (2 ms)
+    √ tipoAnulacion 2 con codigoGeneracionR → 400 (12 ms)
+    √ tipoAnulacion 1 con codigoGeneracionR de otro DTE PROCESADO → 200 y lo refleja en el evento (28 ms)
+    √ DTE inexistente → 404 (8 ms)
+  Invalidación · autorización (política ROLES_INVALIDAR = ADMIN)
+    √ sin token → 401 NO_AUTENTICADO (34 ms)
+    √ VENDEDOR → 403 SIN_PERMISO con el formato estándar de error (24 ms)
+    √ VENDEDOR sobre un DTE inexistente también → 403 (la autorización va antes que la búsqueda) (3 ms)
+    √ ADMIN sobre el mismo DTE → 200, INVALIDADO, stock devuelto y bitácora (22 ms)
+
+PASS integration tests/integration/contingencia.test.js
+  X-Simular
+    √ valor inválido → 400 VALIDACION y no se emite nada (15 ms)
+    √ acepta mayúsculas (OK) (14 ms)
+  Rechazo de MH en la emisión
+    √ ok:true (201) con estado RECHAZADO, sin sello y con observaciones (1 ms)
+    √ no descuenta stock (5 ms)
+    √ queda registrado y consume correlativo (20 ms)
+    √ bitácora EMISION con resultado RECHAZADO (18 ms)
+    √ un DTE RECHAZADO no se puede reintentar ni invalidar (409) (14 ms)
+  Contingencia (MH no responde) y reintento exitoso
+    √ estado CONTINGENCIA, sin sello, respuestaMh null, firmado OK (1 ms)
+    √ descuenta stock (la venta ocurrió) (7 ms)
+    √ el JSON del DTE en contingencia cumple el esquema (51 ms)
+    √ no se puede invalidar mientras está en CONTINGENCIA (409) (22 ms)
+    √ reintento con MH aún caído → sigue en CONTINGENCIA, stock sin cambios (12 ms)
+    √ reintento ok → PROCESADO con sello; conserva codigoGeneracion, numeroControl y firma (16 ms)
+    √ reintentar un DTE PROCESADO → 409 ESTADO_INVALIDO (5 ms)
+    √ bitácora: EMISION CONTINGENCIA y dos REINTENTO (CONTINGENCIA, PROCESADO) (16 ms)
+    √ una vez PROCESADO ya se puede invalidar (20 ms)
+  Contingencia → reintento rechazado
+    √ pasa a RECHAZADO y revierte el stock descontado en contingencia (41 ms)
+  Contingencia en CCF (03) y NC (05)
+    √ 03 en contingencia → reintento ok → admite NC (41 ms)
+    √ 05 en contingencia → reintento rechazado → vuelve a sacar el stock devuelto (89 ms)
+  Reintento · errores
+    √ DTE inexistente → 404 (5 ms)
+    √ id inválido → 400 (3 ms)
+
+PASS integration tests/integration/catalogos.test.js
+  Productos
+    √ GET lista los 10 productos del seed con la forma del contrato (7 ms)
+    √ ?q busca por código o descripción (104 ms)
+    √ ADMIN crea (201) y el precio se redondea a 2 decimales (57 ms)
+    √ código repetido → 400 VALIDACION (9 ms)
+    √ precio negativo → 400 VALIDACION (3 ms)
+    √ VENDEDOR no puede crear ni editar → 403 SIN_PERMISO (5 ms)
+    √ PUT parcial y borrado lógico: inactivo no aparece por defecto (105 ms)
+    √ GET /:id inexistente → 404 (5 ms)
+  Clientes
+    √ CONTRIBUYENTE exige NIT, NRC y actividad → 400 (3 ms)
+    √ NIT con formato inválido → 400 (2 ms)
+    √ NIT/NRC con guiones se guardan solo con dígitos (201) (88 ms)
+    √ CONSUMIDOR solo requiere nombre (130 ms)
+    √ P2: guarda todos los datos del receptor con códigos MH (149 ms)
+    √ P2: CONSUMIDOR con DUI (tipoDocumento 13) y dirección opcional (127 ms)
+    √ P2: dirección inválida {"complemento": "Col. Escalón #1", "departamento": "99", "distrito": "14", "municipio": "23"} → 400 (4 ms)
+    √ P2: dirección inválida {"complemento": "Col. Escalón #1", "departamento": "06", "distrito": "14", "municipio": "05"} → 400 (3 ms)
+    √ P2: dirección inválida {"complemento": "Col. Escalón #1", "departamento": "06", "distrito": "01", "municipio": "23"} → 400 (2 ms)
+    √ P2: dirección inválida {"complemento": "", "departamento": "06", "distrito": "14", "municipio": "23"} → 400 (3 ms)
+    √ P2: dirección inválida "Col. Escalón" → 400 (2 ms)
+    √ P2: CONTRIBUYENTE sin dirección → 400; tipoDocumento fuera del CAT-022 → 400 (4 ms)
+    √ P2: GET /api/catalogos → departamentos/municipios/distritos y tipos de documento (4 ms)
+    √ ?tipo filtra por tipo (10 ms)
+    √ PUT revalida el registro completo: quitar el NRC a un CONTRIBUYENTE → 400 (5 ms)
+  Clientes · edición (KAN-34)
+    √ registro de consumidor final y de contribuyente (201)
+    √ VENDEDOR edita un contribuyente: datos fiscales, contacto y dirección (200) y queda en bitácora (89 ms)
+    √ consulta del cliente actualizado: GET /:id y búsqueda por el nuevo NIT (14 ms)
+    √ consumidor: agregar DUI y dirección; luego quitarlos (null) (246 ms)
+    √ consumidor → contribuyente: exige los datos fiscales; con ellos pasa a documento NIT (89 ms)
+    √ rechaza datos inválidos al editar (NIT con 10 dígitos) → 400 VALIDACION y no cambia nada (9 ms)
+    √ rechaza datos inválidos al editar (NRC con letras) → 400 VALIDACION y no cambia nada (10 ms)
+    √ rechaza datos inválidos al editar (NRC de 9 dígitos) → 400 VALIDACION y no cambia nada (8 ms)
+    √ rechaza datos inválidos al editar (actividad de 3 dígitos) → 400 VALIDACION y no cambia nada (8 ms)
+    √ rechaza datos inválidos al editar (sin descripción de actividad) → 400 VALIDACION y no cambia nada (10 ms)
+    √ rechaza datos inválidos al editar (sin dirección) → 400 VALIDACION y no cambia nada (10 ms)
+    √ rechaza datos inválidos al editar (municipio de otro departamento) → 400 VALIDACION y no cambia nada (8 ms)
+    √ rechaza datos inválidos al editar (correo inválido) → 400 VALIDACION y no cambia nada (8 ms)
+    √ consumidor: tipo de documento fuera del CAT-022 o DUI mal formado → 400 (155 ms)
+    √ PUT a un cliente inexistente → 404 (4 ms)
+    √ el cliente editado se asocia a una venta: el CCF lleva los datos nuevos en el receptor (176 ms)
+    √ un consumidor editado (DUI) aparece como receptor de la Factura 01 (267 ms)
+  Emisor
+    √ GET /api/emisor devuelve los datos del seed con M001/P001 (6 ms)
+
+PASS integration tests/integration/dte05.notaCredito.test.js
+  05 NC · emisión exitosa sobre un CCF
+    √ 201 PROCESADO con número de control del tipo 05 (2 ms)
+    √ jsonDte cumple fe-nc-v4.json (56 ms)
+    √ documentoRelacionado = [{03, generación 2, codigoGeneracion del CCF, fecha}]
+    √ mismo receptor que el CCF
+    √ montos: 5 × 2.50 = 12.50 + IVA 1.63 = 14.13 (1 ms)
+    √ devuelve el stock (7 ms)
+    √ el CCF muestra acreditada/pendiente y la NC en notasCredito (14 ms)
+  05 NC · límites de cantidad y descuento proporcional
+    √ cantidad mayor a la pendiente → 400 VALIDACION (11 ms)
+    √ descuento del CCF se acredita en proporción y la última acreditación toma el resto exacto (61 ms)
+    √ sin pendiente → 400 (8 ms)
+    √ una NC RECHAZADA no cuenta como acreditada ni devuelve stock (39 ms)
+    √ una NC en CONTINGENCIA sí cuenta como acreditada (reserva lo pendiente) y devuelve stock (37 ms)
+  05 NC · reglas del documento relacionado
+    √ producto que no está en el CCF → 400 (8 ms)
+    √ clienteId distinto del receptor del CCF → 400 (7 ms)
+    √ clienteId igual al del CCF → 201 (36 ms)
+    √ sobre una Factura 01 → 400 VALIDACION (22 ms)
+    √ sobre un CCF RECHAZADO → 409 ESTADO_INVALIDO (23 ms)
+    √ sobre un CCF en CONTINGENCIA → 409 ESTADO_INVALIDO (23 ms)
+    √ CCF inexistente → 404 (6 ms)
+    √ sin dteRelacionadoId → 400 (4 ms)
+
+PASS integration tests/integration/consultas.test.js
+  GET /api/dte
+    √ lista todos, el más reciente primero, con la forma del contrato (14 ms)
+    √ filtro {"tipo": "01"} (12 ms)
+    √ filtro {"tipo": "05"} (8 ms)
+    √ filtro {"estado": "INVALIDADO"} (14 ms)
+    √ filtro {"estado": "RECHAZADO"} (12 ms)
+    √ filtro {"estado": "CONTINGENCIA"} (16 ms)
+    √ filtro {"estado": "PROCESADO", "tipo": "03"} (13 ms)
+    √ filtro clienteId (12 ms)
+    √ filtro de fechas inclusivo (hoy) y fuera de rango (26 ms)
+    √ filtro inválido {"tipo": "99"} → 400 (4 ms)
+    √ filtro inválido {"estado": "BORRADO"} → 400 (4 ms)
+    √ filtro inválido {"desde": "04/11/2026"} → 400 (2 ms)
+  GET /api/dte/:id
+    √ detalle con jsonDte, items, firmador/respuestaMh parseados y usuario (11 ms)
+    √ inexistente → 404; id inválido → 400 (8 ms)
+  GET /api/bitacora
+    √ registra cada operación con la acción y el resultado (11 ms)
+    √ filtros accion, usuario, dteId y limite (26 ms)
+    √ limite fuera de 1–1000 → 400 (5 ms)
+
+PASS integration tests/integration/loteContingencia.test.js
+  GET/PUT /api/contingencia/programacion
+    √ GET (cualquier rol): activo, hora HH:mm, próxima ejecución y pendientes (6 ms)
+    √ sin token → 401 (2 ms)
+    √ PUT VENDEDOR → 403 SIN_PERMISO (3 ms)
+    √ PUT {} → 400 VALIDACION (sin campos) (2 ms)
+    √ PUT {"hora":"24:00"} → 400 VALIDACION (hora fuera de rango) (3 ms)
+    √ PUT {"hora":"7:5"} → 400 VALIDACION (hora sin formato HH:mm) (2 ms)
+    √ PUT {"activo":"si"} → 400 VALIDACION (activo no booleano) (2 ms)
+    √ PUT cambia la hora y recalcula la próxima ejecución; queda en bitácora (37 ms)
+    √ PUT activo:false → sin próxima ejecución (26 ms)
+  Lote manual (POST /api/contingencia sin dteIds)
+    √ toma todos los DTE en contingencia del momento, con origen MANUAL (23 ms)
+    √ recepción por lote: jsonLote con los DTE firmados y respuesta MH RECIBIDO con codigoLote (30 ms)
+    √ cada DTE del lote queda PROCESADO con sello y la cola queda vacía (5 ms)
+    √ GET /:id y GET / exponen origen, codigoLote y el lote (12 ms)
+    √ evento rechazado → sin lote (codigoLote null) y los DTE siguen en contingencia (59 ms)
+  Lote automático (cierre del día)
+    √ sin DTE en contingencia → SIN_PENDIENTES (no crea evento) y queda en bitácora (39 ms)
+    √ con DTE pendientes → evento AUTOMATICO firmado por un ADMIN y lote enviado (94 ms)
+    √ MH rechaza el evento → RECHAZADO, sin lote; los DTE quedan para el siguiente lote (40 ms)
+    √ MH no responde → SIN_RESPUESTA (no lanza error) y los DTE siguen pendientes (15 ms)
+    √ el siguiente lote automático recoge lo que quedó pendiente (23 ms)
+
+PASS integration tests/integration/dte03.ccf.test.js
+  03 CCF · emisión exitosa
+    √ 201 PROCESADO, total 113.00, número de control del tipo 03 (1 ms)
+    √ jsonDte cumple fe-ccf-v4.json (version 4, sin extension) (41 ms)
+    √ precios SIN IVA y tributo 20 de 13 % en el resumen (1 ms)
+    √ receptor con NIT, NRC y actividad del contribuyente
+    √ P2: nombre comercial, teléfono y dirección con los códigos MH del cliente (1 ms)
+    √ items con acreditada 0 y pendiente = cantidad (para la NC)
+    √ descuenta stock (100 − 40) (6 ms)
+  03 CCF · validaciones del receptor
+    √ sin clienteId → 400 VALIDACION (5 ms)
+    √ cliente CONSUMIDOR → 400 "debe ser CONTRIBUYENTE" (7 ms)
+    √ cliente inexistente → 404 (6 ms)
+    √ cliente inactivo → 400 (25 ms)
+  03 CCF · variantes
+    √ descuento SIN IVA: 2 × 18.50 − 7 = 30 + 3.90 = 33.90 (25 ms)
+    √ a crédito: pagos = null y sigue cumpliendo el esquema (25 ms)
+    √ el correlativo del 03 es independiente del 01 (21 ms)
+
+PASS integration tests/integration/auth.test.js
+  GET /api/health
+    √ sin token responde api/db ok y ambiente 00 (5 ms)
+  POST /api/auth/login
+    √ credenciales correctas → token JWT y usuario con rol (70 ms)
+    √ contraseña incorrecta → 401 CREDENCIALES y bitácora LOGIN_FALLIDO (82 ms)
+    √ faltan campos → 400 VALIDACION (3 ms)
+    √ JSON mal formado → 400 VALIDACION (5 ms)
+  Rutas protegidas
+    √ GET /api/productos sin token → 401 NO_AUTENTICADO (2 ms)
+    √ GET /api/clientes sin token → 401 NO_AUTENTICADO (2 ms)
+    √ GET /api/emisor sin token → 401 NO_AUTENTICADO (2 ms)
+    √ GET /api/dte sin token → 401 NO_AUTENTICADO (3 ms)
+    √ GET /api/bitacora sin token → 401 NO_AUTENTICADO (2 ms)
+    √ token inválido → 401 (3 ms)
+    √ ruta /api inexistente → 404 NO_ENCONTRADO con formato estándar (2 ms)
+
+PASS unit tests/unit/contingencia.test.js
+  enContingencia (DTE emitido sin respuesta de MH)
+    √ cambia solo la identificación: modelo diferido 2, operación 2, tipoContingencia 1, motivoContin null (2 ms)
+    √ conserva codigoGeneracion y numeroControl (1 ms)
+    √ 01, 03 y 05 en contingencia siguen cumpliendo sus esquemas MH (126 ms)
+  Evento de contingencia · builder
+    √ cumple contingencia-schema-v4.json (9 ms)
+    √ estructura: identificacion v4, emisor con responsable, detalleDTE numerado y motivo (1 ms)
+  MH simulado · recepción del evento de contingencia
+    √ ok → PROCESADO con sello de 40 caracteres
+    √ rechazo → RECHAZADO sin sello
+    √ contingencia → MH sigue sin responder (null)
+  MH simulado · recepción por lote
+    √ RECIBIDO con el idEnvio del lote y un codigoLote UUID en mayúsculas
+  Lote automático · próxima ejecución
+    √ si la hora aún no pasa hoy → hoy a esa hora
+    √ si ya pasó (o es exactamente esa hora) → mañana
+    √ cruza fin de mes
+  Lote automático · temporizador
+    √ iniciar() programa el lote para la próxima hora configurada; detener() lo cancela (1 ms)
+    √ desactivado → no programa nada (1 ms)
+  MH simulado · modo timeout y consulta de DTE
+    √ timeout es un modo válido y, para el POS, no hay respuesta (recepción, anulación y evento)
+    √ consulta: MH tiene el documento → su respuesta PROCESADO original (mismo sello)
+    √ consulta: MH no lo tiene → estado null, código 004 NO ENCONTRADO (1 ms)
+    √ consulta con MH caído (contingencia o timeout) → null
+  Cola de consultas · temporizador
+    √ iniciar() programa el siguiente turno a intervaloSeg; detener() lo cancela
+    √ desactivada → no programa nada
+
+PASS unit tests/unit/builders.test.js
+  01 Factura · builder
+    √ sin receptor: cumple fe-f-v2.json y tiene los nodos del DTE (sin extension) (45 ms)
+    √ con receptor consumidor con DUI y a crédito: cumple el esquema y pagos = null (1 ms)
+    √ cliente anterior a P2 (dirección solo texto): códigos del emisor + texto como complemento
+    √ control negativo: el validador rechaza un nodo `extension` o un numeroControl mal formado (1 ms)
+    √ con receptor contribuyente: tipoDocumento 36 + NIT
+  03 CCF · builder
+    √ cumple fe-ccf-v4.json con receptor CONTRIBUYENTE y tributo 20 (30 ms)
+    √ montos: 40 × 2.50 + (2 × 18.50 − 1) = 136 + IVA 17.68 = 153.68 (1 ms)
+  05 Nota de crédito · builder
+    √ cumple fe-nc-v4.json (19 ms)
+    √ documentoRelacionado apunta al CCF (tipo 03, generación 2, codigoGeneracion y fecha)
+    √ mismo receptor que el CCF y cada ítem referencia al CCF
+  Evento de invalidación · builder
+    √ de una factura sin receptor: cumple invalidacion-schema-v3.json, receptor en null y sin montoIva (12 ms)
+    √ de un CCF: documento con tipoDocumento 36 + NIT del receptor (1 ms)
+
+PASS unit tests/unit/middleware.test.js
+  middleware/auth
+    √ token válido deja req.usuario (1 ms)
+    √ sin header → 401 NO_AUTENTICADO (1 ms)
+    √ esquema distinto de Bearer → 401 NO_AUTENTICADO
+    √ token con otra firma → 401 NO_AUTENTICADO
+    √ token vencido → 401 NO_AUTENTICADO (1 ms)
+    √ requireRol permite el rol indicado y bloquea otro con 403 SIN_PERMISO
+  middleware/errores
+    √ noEncontrado → 404 NO_ENCONTRADO
+    √ AppError → { ok:false, error:{codigo,mensaje} } con su status (1 ms)
+    √ JSON mal formado → 400 VALIDACION
+    √ error no controlado → 500 ERROR_INTERNO con mensaje genérico (sin detalles internos) y referencia en el log (1 ms)
+    √ cuerpo demasiado grande → 413 VALIDACION; otros 4xx del parser → status propio sin detalles (1 ms)
+  middleware/auth · cookie de sesión y CSRF
+    √ cookie válida en GET → autenticado sin CSRF
+    √ cookie + POST sin X-CSRF-Token → 403 CSRF_INVALIDO
+    √ cookie + PUT con X-CSRF-Token distinto → 403 CSRF_INVALIDO
+    √ cookie + POST con X-CSRF-Token correcto → autenticado
+    √ Bearer no necesita CSRF; un Bearer inválido no cae a la cookie (1 ms)
+    √ token firmado con otro algoritmo (none) → 401
+  config/seguridad
+    √ CORS por defecto: solo el servidor local; CORS_ORIGENES lo reemplaza
+    √ credenciales demo: explícitas con DEMO_CREDENCIALES; por defecto solo localhost fuera de producción (1 ms)
+    √ JWT_SECRET débil: vacío, corto o el de ejemplo
+
+PASS unit tests/unit/simuladores.test.js
+  firmador simulado
+    √ devuelve status OK y un JWS falso de 3 partes base64url con el JSON en el payload (2 ms)
+    √ la firma es aleatoria y el firmador responde OK aun en contingencia (MH es el que falla)
+  MH recepción simulada
+    √ leerModo: por defecto ok; acepta mayúsculas/espacios; valor desconocido → 400 VALIDACION (10 ms)
+    √ generarSello: año + 36 alfanuméricos = 40 caracteres
+    √ fhProcesamiento con formato dd/MM/yyyy HH:mm:ss
+    √ ok → PROCESADO con sello y la forma completa del contrato
+    √ rechazo → RECHAZADO sin sello y con observaciones
+    √ contingencia → MH no responde (null)
+  MH anulación simulada (evento de invalidación)
+    √ ok → PROCESADO con sello propio de 40 caracteres
+    √ rechazo → RECHAZADO sin sello
+    √ contingencia → null (no existe contingencia para eventos) (1 ms)
+
+PASS unit tests/unit/numeroALetras.test.js
+  dte/numeroALetras
+    √ 113 → CIENTO TRECE 00/100 USD (1 ms)
+    √ 0 → CERO 00/100 USD
+    √ 1 → UNO 00/100 USD
+    √ 5.66 → CINCO 66/100 USD
+    √ 9.16 → NUEVE 16/100 USD (1 ms)
+    √ 16 → DIECISÉIS 00/100 USD
+    √ 21 → VEINTIUNO 00/100 USD
+    √ 45 → CUARENTA Y CINCO 00/100 USD
+    √ 100 → CIEN 00/100 USD
+    √ 101 → CIENTO UNO 00/100 USD
+    √ 500 → QUINIENTOS 00/100 USD
+    √ 1000 → MIL 00/100 USD
+    √ 1250.5 → MIL DOSCIENTOS CINCUENTA 50/100 USD
+    √ 21000 → VEINTIÚN MIL 00/100 USD
+    √ 31000 → TREINTA Y UN MIL 00/100 USD
+    √ 100000 → CIEN MIL 00/100 USD
+    √ 1000000 → UN MILLÓN 00/100 USD (1 ms)
+    √ 2500000.99 → DOS MILLONES QUINIENTOS MIL 99/100 USD
+    √ 1.005 → UNO 01/100 USD
+    √ valores no numéricos se tratan como cero
+
+PASS unit tests/unit/calculos.test.js
+  dte/calculos · porcentaje
+    √ calcula en centavos: 2.50 × 113 % = 2.83 (no 2.82) (1 ms)
+  01 Factura · calcularFactura
+    √ precio CON IVA (precio × 1.13) e IVA incluido (1 ms)
+    √ descuento por línea en base CON IVA y varias líneas
+    √ IVA = gravado / 1.13 × 0.13 con redondeo a 2 decimales
+    √ descuento mayor que la línea → VALIDACION (12 ms)
+  03 CCF · calcularCcf
+    √ precio SIN IVA y tributo 20 = 13 %: 40 × 2.50 → 100 + 13 = 113 (1 ms)
+    √ descuento en base SIN IVA
+  05 Nota de crédito · calcularNotaCredito
+    √ usa precio y venta gravada del CCF; IVA 13 % en tributos y totalIva (1 ms)
+    √ regresión: 3 de 10 × 1.10 (11 × 3 / 10 = 3.3000000000000003) → montoDescu 0, no NaN
+    √ un descuento proporcional del CCF aparece como montoDescu
+
+PASS unit tests/unit/utilidades.test.js
+  utils/dinero · redondear2
+    √ redondear2(1.005) = 1.01 (half-up, sin error de coma flotante) (1 ms)
+    √ redondear2(2.825) = 2.83 (half-up, sin error de coma flotante)
+    √ redondear2(1.004) = 1 (half-up, sin error de coma flotante)
+    √ redondear2(0.30000000000000004) = 0.3 (half-up, sin error de coma flotante)
+    √ redondear2(113) = 113 (half-up, sin error de coma flotante) (1 ms)
+    √ redondear2(-1.005) = -1.01 (half-up, sin error de coma flotante)
+    √ redondear2(0) = 0 (half-up, sin error de coma flotante)
+    √ redondear2(0.005) = 0.01 (half-up, sin error de coma flotante)
+    √ redondear2(0.004) = 0 (half-up, sin error de coma flotante)
+    √ redondear2(4.440892098500626e-16) = 0 (half-up, sin error de coma flotante) (1 ms)
+    √ redondear2(1e-7) = 0 (half-up, sin error de coma flotante)
+    √ redondear2(-4.4e-16) = 0 (half-up, sin error de coma flotante)
+  utils/validar
+    √ texto recorta y exige contenido y longitud máxima (1 ms)
+    √ textoOpc convierte vacío en null
+    √ dinero redondea a 2 decimales y respeta el mínimo
+    √ entero exige enteros >= min (1 ms)
+    √ digitos quita guiones/espacios y valida longitudes (NIT 9 o 14, NRC 1–8)
+    √ id acepta solo enteros positivos (1 ms)
+  utils/respuesta
+    √ ok() responde { ok: true, data } con el status indicado
+    √ AppError guarda código y status
+    √ asyncHandler envía al next los errores de un handler async (1 ms)
+
+Test Suites: 22 passed, 22 total
+Tests:       458 passed, 458 total
+Snapshots:   0 total
+Time:        39.664 s
+Ran all test suites in 2 projects.
+exit=0

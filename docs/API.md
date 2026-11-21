@@ -542,12 +542,13 @@ Cualquier rol. Lote automático del cierre del día:
 ```
 
 - `proximaEjecucion` = `null` si está desactivado. `pendientes` = DTE en `CONTINGENCIA` ahora.
-- `ultimaEjecucion` (solo del automático; `null` si no ha corrido desde que arrancó el servidor). `resultado`: `PROCESADO` | `RECHAZADO` | `SIN_PENDIENTES` (no había DTE; no crea evento) | `SIN_RESPUESTA` | `ERROR`.
-- Valor inicial desde `backend/.env`: `CONTINGENCIA_LOTE_HORA` (defecto `23:55`), `CONTINGENCIA_LOTE_ACTIVO` (defecto `1`). Los cambios por `PUT` viven en memoria (se pierden al reiniciar el servidor). Hora local del servidor.
+- `ultimaEjecucion`: última ejecución real del automático (de `dbo.ejecucion_tarea`, sobrevive a reinicios; `null` si nunca corrió; no cuenta las `OMITIDA`). `resultado`: `PROCESADO` | `RECHAZADO` | `SIN_PENDIENTES` (no había DTE; no crea evento) | `SIN_RESPUESTA` | `ERROR` (mensaje genérico; el detalle va al registro de ejecuciones).
+- **Fase 5:** `activo` y `hora` se guardan en SQL Server (`dbo.config_tarea`) y se recuperan al reiniciar. `backend/.env` solo da el valor de la primera vez (`CONTINGENCIA_LOTE_HORA`, defecto `23:55`; `CONTINGENCIA_LOTE_ACTIVO`, defecto `1`) y `db/03_reset_demo.sql` vuelve a él. Hora local del servidor.
+- Sin duplicados: el temporizador corre como máximo un lote por día y toma un candado en BD; si otro proceso lo tiene, esa ejecución queda `OMITIDA` en `GET /api/contingencia/ejecuciones`.
 
 ### PUT /api/contingencia/programacion → 200 (solo ADMIN)
 
-`{ "activo": true, "hora": "21:30" }` (al menos uno). `activo` booleano; `hora` `HH:mm` 00:00–23:59; si no → 400 `VALIDACION`. Reprograma el temporizador y responde igual que el `GET`. Bitácora `ACTUALIZAR` (`entidad: "programacion_contingencia"`, `datos: { antes, cambios }`).
+`{ "activo": true, "hora": "21:30" }` (al menos uno). `activo` booleano; `hora` `HH:mm` 00:00–23:59; si no → 400 `VALIDACION`. Guarda en `dbo.config_tarea`, reprograma el temporizador y responde igual que el `GET`. Bitácora `ACTUALIZAR` (`entidad: "programacion_contingencia"`, `datos: { antes, cambios }`).
 
 ### GET /api/contingencia/consultas (C3)
 
@@ -561,12 +562,30 @@ Cualquier rol. Cola de consultas a MH: durante el día, cada `intervaloSeg` segu
 } }
 ```
 
-- `proximaConsulta` = `null` si está desactivada o el temporizador no corre. `ultimaConsulta` = último turno automático (`null` si aún no hubo; `resultado: "ERROR"` con `mensaje` si falló).
-- Valor inicial desde `backend/.env`: `CONSULTA_MH_ACTIVO` (defecto `1`), `CONSULTA_MH_INTERVALO_SEG` (defecto `60`). Los cambios por `PUT` viven en memoria.
+- `proximaConsulta` = `null` si está desactivada o el temporizador no corre en este servidor. `ultimaConsulta` = último turno automático que consultó un DTE (de `dbo.ejecucion_tarea`, sobrevive a reinicios; `null` si aún no hubo; `resultado: "ERROR"` con mensaje genérico si falló). Los turnos con la cola vacía no se registran.
+- **Fase 5:** `activo` e `intervaloSeg` se guardan en SQL Server (`dbo.config_tarea`) y se recuperan al reiniciar. `backend/.env` solo da el valor de la primera vez (`CONSULTA_MH_ACTIVO`, defecto `1`; `CONSULTA_MH_INTERVALO_SEG`, defecto `60`). Un turno que se solapa con otro en curso (en este u otro proceso) queda `OMITIDA`.
 
 ### PUT /api/contingencia/consultas → 200 (solo ADMIN)
 
-`{ "activo": true, "intervaloSeg": 30 }` (al menos uno). `activo` booleano; `intervaloSeg` entero 10–3600; si no → 400 `VALIDACION`. Reprograma el temporizador y responde igual que el `GET`. Bitácora `ACTUALIZAR` (`entidad: "consultas_mh"`).
+`{ "activo": true, "intervaloSeg": 30 }` (al menos uno). `activo` booleano; `intervaloSeg` entero 10–3600; si no → 400 `VALIDACION`. Guarda en `dbo.config_tarea`, reprograma el temporizador y responde igual que el `GET`. Bitácora `ACTUALIZAR` (`entidad: "consultas_mh"`).
+
+### GET /api/contingencia/ejecuciones?tarea=&limite= (Fase 5)
+
+Cualquier rol. Registro de ejecuciones de las tareas programadas, más reciente primero. `tarea`: `LOTE_CONTINGENCIA` | `CONSULTA_MH` (opcional); `limite` 1–500 (defecto 50); otro valor → 400 `VALIDACION`.
+
+```json
+{ "ok": true, "data": [
+  { "id": 41, "tarea": "LOTE_CONTINGENCIA", "disparo": "TEMPORIZADOR", "proceso": "SERVIDOR:1234:a1b2c3",
+    "inicio": "2026-11-21T05:55:00.012Z", "fin": "2026-11-21T05:55:00.318Z", "duracionMs": 306,
+    "resultado": "PROCESADO", "mensaje": "Lote enviado: 4 de 4 DTE transmitidos y sellados",
+    "detalle": { "fecha": "2026-11-20T23:55:00", "resultado": "PROCESADO", "eventoId": 7, "codigoLote": "5E0A...", "cantidad": 4, "mensaje": "..." },
+    "conError": false }
+] }
+```
+
+- `disparo`: `TEMPORIZADOR` (el servidor) | `DIRECTO` (llamada interna, p. ej. pruebas). `inicio`/`fin` en UTC.
+- `resultado`: los del lote o de la consulta (`ENCONTRADO`, `NO_ENCONTRADO`, `SIN_RESPUESTA`) más `OMITIDA` (ya había una ejecución en curso o el lote ya corrió ese día; `mensaje` dice cuál) y `ERROR`.
+- `conError: true` si falló; el texto del error y su stack se guardan en `dbo.ejecucion_tarea.error` y en el log del servidor, **nunca** en la respuesta.
 
 ---
 

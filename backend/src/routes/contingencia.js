@@ -9,6 +9,7 @@ router.get('/programacion', asyncHandler(c.obtenerProgramacion));
 router.put('/programacion', requireRol('ADMIN'), asyncHandler(c.actualizarProgramacion));
 router.get('/consultas', asyncHandler(c.obtenerConsultas));
 router.put('/consultas', requireRol('ADMIN'), asyncHandler(c.actualizarConsultas));
+router.get('/ejecuciones', asyncHandler(c.listarEjecuciones)); // Fase 5: registro de ejecuciones (antes de /:id)
 router.get('/:id', asyncHandler(c.obtener));
 router.post('/', requireRol('ADMIN'), asyncHandler(c.enviar));
 

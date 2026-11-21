@@ -1,0 +1,113 @@
+$ npm run test:coverage   (2026-11-20T20:53:39-06:00)
+
+> pos-dte-backend@0.1.0 test:coverage
+> jest --runInBand --coverage
+
+PASS integration tests/integration/seguridad.test.js (7.603 s)
+PASS integration tests/integration/catalogos.test.js
+PASS integration tests/integration/autorizacion.test.js
+PASS integration tests/integration/eventoContingencia.test.js
+PASS integration tests/integration/pdf.test.js
+PASS integration tests/integration/consultaMh.test.js
+PASS integration tests/integration/dte01.factura.test.js
+PASS integration tests/integration/loteContingencia.test.js
+PASS integration tests/integration/invalidacion.test.js
+PASS integration tests/integration/consultas.test.js
+PASS integration tests/integration/contingencia.test.js
+PASS integration tests/integration/dte05.notaCredito.test.js
+PASS integration tests/integration/resetDemo.test.js
+PASS integration tests/integration/dte03.ccf.test.js
+PASS integration tests/integration/auth.test.js
+PASS unit tests/unit/contingencia.test.js
+PASS unit tests/unit/builders.test.js
+PASS unit tests/unit/middleware.test.js
+PASS unit tests/unit/calculos.test.js
+PASS unit tests/unit/utilidades.test.js
+PASS unit tests/unit/simuladores.test.js
+PASS unit tests/unit/numeroALetras.test.js
+
+=============================== Coverage summary ===============================
+Statements   : 96.39% ( 1553/1611 )
+Branches     : 84.42% ( 916/1085 )
+Functions    : 98.22% ( 276/281 )
+Lines        : 98.2% ( 1364/1389 )
+================================================================================
+----------------------------|---------|----------|---------|---------|-------------------
+File                        | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------------------------|---------|----------|---------|---------|-------------------
+All files                   |   96.39 |    84.42 |   98.22 |    98.2 |                   
+ src                        |   93.54 |       50 |      50 |     100 |                   
+  app.js                    |   93.54 |       50 |      50 |     100 | 11                
+ src/config                 |   95.91 |    83.33 |   92.85 |   94.87 |                   
+  db.js                     |   91.66 |       70 |   83.33 |   90.47 | 22-23             
+  politicas.js              |     100 |      100 |     100 |     100 |                   
+  seguridad.js              |     100 |    88.46 |     100 |     100 | 13,40-50          
+ src/controllers            |     100 |       50 |     100 |     100 |                   
+  authController.js         |     100 |      100 |     100 |     100 |                   
+  bitacoraController.js     |     100 |      100 |     100 |     100 |                   
+  catalogosController.js    |     100 |      100 |     100 |     100 |                   
+  clientesController.js     |     100 |       50 |     100 |     100 | 14-17             
+  contingenciaController.js |     100 |       50 |     100 |     100 | 9                 
+  dteController.js          |     100 |       50 |     100 |     100 | 13-25             
+  emisorController.js       |     100 |      100 |     100 |     100 |                   
+  productosController.js    |     100 |       50 |     100 |     100 | 10-13             
+ src/dte                    |   95.54 |    77.72 |     100 |    98.9 |                   
+  calculos.js               |     100 |      100 |     100 |     100 |                   
+  catalogosMh.js            |      90 |       75 |     100 |   95.45 | 199               
+  correlativo.js            |   88.88 |       50 |     100 |     100 | 24                
+  numeroALetras.js          |     100 |      100 |     100 |     100 |                   
+  pdf.js                    |   94.94 |    73.33 |     100 |   98.85 | 37-38             
+ src/dte/builders           |     100 |    75.67 |     100 |     100 |                   
+  ccf03.js                  |     100 |       50 |     100 |     100 | 15-18             
+  comun.js                  |     100 |    76.92 |     100 |     100 | 13-24,40-46       
+  contingencia.js           |     100 |      100 |     100 |     100 |                   
+  factura01.js              |     100 |    86.36 |     100 |     100 | 11-14,19          
+  invalidacion.js           |     100 |    78.57 |     100 |     100 | 16-18             
+  notaCredito05.js          |     100 |       50 |     100 |     100 | 25-28             
+ src/dte/simuladores        |   98.57 |    90.62 |     100 |     100 |                   
+  firmador.js               |     100 |      100 |     100 |     100 |                   
+  mhAnulacion.js            |     100 |    93.33 |     100 |     100 | 9                 
+  mhConsulta.js             |     100 |      100 |     100 |     100 |                   
+  mhContingencia.js         |     100 |    93.33 |     100 |     100 | 10                
+  mhRecepcion.js            |     100 |     87.5 |     100 |     100 | 27-43             
+  mhRegistro.js             |    92.3 |       75 |     100 |     100 | 13                
+ src/middleware             |   94.79 |    87.65 |   94.11 |   97.64 |                   
+  auth.js                   |     100 |    96.42 |     100 |     100 | 9                 
+  errores.js                |     100 |      100 |     100 |     100 |                   
+  limiteLogin.js            |   90.24 |    70.37 |   88.88 |   94.11 | 18-19             
+  seguridad.js              |   91.66 |    83.33 |     100 |     100 | 47                
+ src/routes                 |     100 |      100 |     100 |     100 |                   
+  auth.js                   |     100 |      100 |     100 |     100 |                   
+  bitacora.js               |     100 |      100 |     100 |     100 |                   
+  catalogos.js              |     100 |      100 |     100 |     100 |                   
+  clientes.js               |     100 |      100 |     100 |     100 |                   
+  contingencia.js           |     100 |      100 |     100 |     100 |                   
+  dte.js                    |     100 |      100 |     100 |     100 |                   
+  emisor.js                 |     100 |      100 |     100 |     100 |                   
+  health.js                 |     100 |      100 |     100 |     100 |                   
+  productos.js              |     100 |      100 |     100 |     100 |                   
+ src/services               |   95.42 |    87.16 |   98.23 |   97.22 |                   
+  authService.js            |     100 |      100 |     100 |     100 |                   
+  bitacoraService.js        |    91.3 |    85.36 |     100 |     100 | 5,19-21,58,60     
+  clientesService.js        |   94.28 |    85.98 |     100 |   98.79 | 68                
+  consultaMhService.js      |   92.85 |    84.12 |   91.66 |   93.05 | 105-107,121-122   
+  contingenciaService.js    |   97.95 |    84.09 |     100 |     100 | 29,34,79-91,137   
+  dteConsultasService.js    |     100 |    90.69 |     100 |     100 | 19,64,111         
+  dteService.js             |    97.1 |    89.77 |     100 |   98.07 | 100,139,389-390   
+  emisorService.js          |    87.5 |       50 |     100 |     100 | 8                 
+  loteAutomaticoService.js  |   89.85 |    87.23 |   88.88 |   91.66 | 77-81,95-96       
+  productosService.js       |   93.54 |       80 |     100 |   93.33 | 43,72             
+ src/utils                  |   98.64 |    93.33 |     100 |   98.36 |                   
+  bitacora.js               |      90 |    83.33 |     100 |   88.88 | 19                
+  cookies.js                |     100 |      100 |     100 |     100 |                   
+  dinero.js                 |     100 |      100 |     100 |     100 |                   
+  respuesta.js              |     100 |       50 |     100 |     100 | 3                 
+  validar.js                |     100 |    97.29 |     100 |     100 | 36                
+----------------------------|---------|----------|---------|---------|-------------------
+
+Test Suites: 22 passed, 22 total
+Tests:       458 passed, 458 total
+Snapshots:   0 total
+Time:        34.319 s, estimated 36 s
+Ran all test suites in 2 projects.
+exit=0
