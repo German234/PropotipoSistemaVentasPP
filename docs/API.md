@@ -294,6 +294,8 @@ JSON según `schemas-mh/fe-nc-v4.json` (`version: 4`): `documentoRelacionado = [
 
 ### POST /api/dte/:id/invalidar
 
+**Rol:** `ADMIN` (política `ROLES_INVALIDAR` en `backend/src/config/politicas.js`, pendiente de validar con el Product Owner). Sin token → 401 `NO_AUTENTICADO`; otro rol → 403 `SIN_PERMISO` (se verifica antes de buscar el DTE; no toca estado, stock ni bitácora).
+
 Solo sobre DTE `PROCESADO` (si no → 409 `ESTADO_INVALIDO`); un 03 con NC vigente (05 en `PROCESADO`/`CONTINGENCIA`) → 409 (hay que invalidar antes las NC). Responde 200.
 
 ```json

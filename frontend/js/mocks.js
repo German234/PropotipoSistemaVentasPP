@@ -642,6 +642,7 @@ var MockApi = (function () {
   }
 
   function invalidar(id, body, u, modo) {
+    requireAdmin(u); // ROLES_INVALIDAR = ['ADMIN'] (igual que la API)
     var d = porId(db.dte, id, 'DTE');
     if (d.estado !== 'PROCESADO') err('ESTADO_INVALIDO', 'Solo se puede invalidar un DTE PROCESADO (estado actual: ' + d.estado + ')');
     if (d.tipoDte === '03' && db.dte.some(function (n) { return n.dteRelacionadoId === d.id && (n.estado === 'PROCESADO' || n.estado === 'CONTINGENCIA'); }))

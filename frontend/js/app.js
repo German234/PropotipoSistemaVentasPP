@@ -56,7 +56,7 @@
   function cerrarSesionLocal(){
     usuarioActual = null;
     document.body.classList.remove('rol-admin');
-    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null; catalogosMh = null;
+    inventory = []; cart = []; clientes = []; clientesVenta = []; ventaClienteId = null; catalogosMh = null; limpiarFormCliente();
     closeDteResult(); closeAnular(); closeNotaCredito();
     dtes = []; bitacora = []; ctPendientes = []; ctEventos = []; ctProg = null; ctConsultas = null; actualizarColaContingencia(0); renderHistorial(); renderBitacora(); renderContingencia();
     var ctm = document.getElementById('ct-motivo'); if(ctm) ctm.value = '';
@@ -278,13 +278,15 @@
     var tb = document.getElementById('cli-tbody');
     if(!tb) return;
     if(clientes.length===0){
-      tb.innerHTML = '<tr><td colspan="6"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:22px">Sin clientes</div></td></tr>';
     } else {
       tb.innerHTML = clientes.map(function(c){
-        return '<tr><td class="prod-name">'+_h(c.nombre)+(c.nombreComercial?'<div class="muted small">'+_h(c.nombreComercial)+'</div>':'')+'</td>'+
+        var editando = clienteEditando && clienteEditando.id===c.id;
+        return '<tr'+(editando?' style="background:var(--surface-2)"':'')+'><td class="prod-name">'+_h(c.nombre)+(c.nombreComercial?'<div class="muted small">'+_h(c.nombreComercial)+'</div>':'')+'</td>'+
           '<td>'+(c.tipo==='CONTRIBUYENTE'?'Contribuyente':'Consumidor')+'</td>'+
           '<td>'+_h(textoDocumento(c)||'—')+'</td><td>'+_h(c.nrc||'—')+'</td>'+
-          '<td>'+_h(textoUbicacion(c.direccion, true)||'—')+'</td><td>'+_h(c.correo||'—')+'</td></tr>';
+          '<td>'+_h(textoUbicacion(c.direccion, true)||'—')+'</td><td>'+_h(c.correo||'—')+'</td>'+
+          '<td class="num"><div class="row-actions"><button class="icon-btn" title="Editar cliente" onclick="editarCliente('+c.id+')">✏️</button></div></td></tr>';
       }).join('');
     }
     var n = document.getElementById('cli-count'); if(n) n.textContent = clientes.length + ' clientes';
@@ -297,7 +299,61 @@
     document.getElementById('cli-dir-req').style.display = esContrib ? '' : 'none';
   }
 
-  function crearCliente(){
+  /* ===== KAN-34: edición de clientes (PUT /api/clientes/:id con el mismo formulario) ===== */
+  var clienteEditando = null;      // cliente original (respuesta de la API) mientras se edita
+  var CLI_INPUTS = ['cli-nombre','cli-comercial','cli-numdoc','cli-nit','cli-nrc','cli-codact','cli-descact','cli-telefono','cli-correo','cli-complemento'];
+
+  function editarCliente(id){
+    // GET /:id para editar sobre los datos vigentes (no sobre una lista que pudo quedar vieja)
+    return Promise.all([cargarCatalogos(), api.clientes.obtener(id)]).then(function(r){
+      var c = r[1];
+      clienteEditando = c;
+      function set(elId, val){ document.getElementById(elId).value = val==null ? '' : val; }
+      set('cli-tipo', c.tipo); toggleCamposContribuyente();
+      set('cli-nombre', c.nombre); set('cli-comercial', c.nombreComercial);
+      set('cli-telefono', c.telefono); set('cli-correo', c.correo);
+      if(c.tipo==='CONTRIBUYENTE'){
+        set('cli-nit', c.nit); set('cli-nrc', c.nrc); set('cli-codact', c.codActividad); set('cli-descact', c.descActividad);
+        set('cli-tipodoc', ''); toggleNumDocumento();
+      } else {
+        ['cli-nit','cli-nrc','cli-codact','cli-descact'].forEach(function(x){ set(x, ''); });
+        set('cli-tipodoc', c.tipoDocumento); toggleNumDocumento(); set('cli-numdoc', c.numDocumento);
+      }
+      // Dirección: depto → municipio → distrito en cascada, igual que al registrar
+      var d = c.direccion || {};
+      set('cli-depto', d.departamento); cambiarDepartamento();
+      set('cli-municipio', d.municipio); cambiarMunicipio();
+      set('cli-distrito', d.distrito);
+      set('cli-complemento', d.complemento);
+      document.getElementById('cli-form-title').textContent = 'Editar cliente: '+c.nombre;
+      document.getElementById('cli-save').textContent = 'Guardar cambios';
+      document.getElementById('cli-cancel').style.display = '';
+      renderClientes();
+      document.getElementById('cli-nombre').focus();
+    }).catch(alertaError);
+  }
+
+  function limpiarFormCliente(){
+    clienteEditando = null;
+    CLI_INPUTS.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    var tipo = document.getElementById('cli-tipo'); if(tipo){ tipo.value = 'CONSUMIDOR'; toggleCamposContribuyente(); }
+    llenarSelectsCliente();
+    var t=document.getElementById('cli-form-title'); if(t) t.textContent='Nuevo cliente';
+    var b=document.getElementById('cli-save'); if(b) b.textContent='+ Guardar cliente';
+    var x=document.getElementById('cli-cancel'); if(x) x.style.display='none';
+    renderClientes();
+  }
+
+  /** Reemplaza el cliente en las listas en memoria (tabla y selector de Nueva venta) sin recargar todo. */
+  function reemplazarCliente(c){
+    function rep(lista){ for(var i=0;i<lista.length;i++){ if(lista[i].id===c.id){ lista[i] = c; return true; } } return false; }
+    rep(clientes);
+    if(!rep(clientesVenta)) cargarClientesVenta();
+    renderClientes();
+    renderClientForm();
+  }
+
+  function guardarCliente(){
     function v(id){ return document.getElementById(id).value.trim(); }
     var tipo = v('cli-tipo');
     var datos = {
@@ -311,7 +367,13 @@
     // Dirección: los tres códigos salen de los selects del catálogo MH
     var dir = { departamento: v('cli-depto'), municipio: v('cli-municipio'), distrito: v('cli-distrito'), complemento: v('cli-complemento') };
     var algo = dir.departamento || dir.municipio || dir.distrito || dir.complemento;
-    if(algo || tipo==='CONTRIBUYENTE'){
+    var ed = clienteEditando;
+    // Cliente anterior a P2 (dirección solo texto, sin códigos): si no se tocó, no se manda y la API la conserva
+    var dirLegada = ed && ed.direccion && !ed.direccion.departamento &&
+      !dir.departamento && dir.complemento === (ed.direccion.complemento || '');
+    if(dirLegada){
+      delete datos.direccion;
+    } else if(algo || tipo==='CONTRIBUYENTE'){
       if(!dir.departamento || !dir.municipio || !dir.distrito || !dir.complemento){
         toast('Completa la dirección: departamento, municipio, distrito y complemento','warn'); return;
       }
@@ -325,18 +387,30 @@
       if(!datos.nit || !datos.nrc || !datos.codActividad || !datos.descActividad){
         toast('Un contribuyente requiere NIT, NRC y actividad económica','warn'); return;
       }
-    } else if(v('cli-tipodoc')){
-      datos.tipoDocumento = v('cli-tipodoc'); datos.numDocumento = v('cli-numdoc') || null;
-      if(!datos.numDocumento){ toast('Ingresa el número de documento','warn'); return; }
+    } else {
+      if(v('cli-tipodoc')){
+        datos.tipoDocumento = v('cli-tipodoc'); datos.numDocumento = v('cli-numdoc') || null;
+        if(!datos.numDocumento){ toast('Ingresa el número de documento','warn'); return; }
+      }
+      // Al editar un consumidor, NRC/actividad no están en el formulario: no se mandan y la API conserva los actuales
+      if(ed && ed.tipo==='CONSUMIDOR'){ delete datos.nrc; delete datos.codActividad; delete datos.descActividad; }
     }
     var btn = document.getElementById('cli-save'); btn.disabled = true;
-    api.clientes.crear(datos).then(function(c){
-      toast('Cliente "'+c.nombre+'" guardado');
-      ['cli-nombre','cli-comercial','cli-numdoc','cli-nit','cli-nrc','cli-codact','cli-descact','cli-telefono','cli-correo','cli-complemento']
-        .forEach(function(id){ document.getElementById(id).value=''; });
-      llenarSelectsCliente();
-      buscarClientes(); cargarClientesVenta();
-    }).catch(alertaError).then(function(){ btn.disabled = false; });
+    var op = ed ? api.clientes.actualizar(ed.id, datos) : api.clientes.crear(datos);
+    op.then(function(c){
+      if(ed){
+        toast('Cliente "'+c.nombre+'" actualizado');
+        limpiarFormCliente();
+        reemplazarCliente(c);   // solo la fila editada y el selector de venta, sin recargar
+      } else {
+        toast('Cliente "'+c.nombre+'" guardado');
+        limpiarFormCliente();
+        buscarClientes(); cargarClientesVenta();
+      }
+    }).catch(function(e){
+      // VALIDACION (400) trae el campo en el mensaje de la API, p. ej. "nit debe tener 9 o 14 dígitos"
+      toast((ed ? 'No se pudo actualizar: ' : 'No se pudo guardar: ')+((e && (e.mensaje||e.message)) || 'Error inesperado'),'warn');
+    }).then(function(){ btn.disabled = false; });
   }
 
   /* catálogo dropdown */
@@ -614,7 +688,7 @@
   function accionesDte(d){
     var b = [];
     if(d.tipoDte==='03' && d.estado==='PROCESADO') b.push('<button class="btn-mini" onclick="abrirNotaCredito('+d.id+')">Nota de crédito</button>');
-    if(d.estado==='PROCESADO') b.push('<button class="btn-mini danger" onclick="abrirAnular('+d.id+')">Anular</button>');
+    if(d.estado==='PROCESADO' && puedeInvalidar()) b.push('<button class="btn-mini danger" onclick="abrirAnular('+d.id+')">Anular</button>');
     if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="consultarMhDte('+d.id+')" title="¿MH sí lo recibió?">Consultar MH</button>');
     if(d.estado==='CONTINGENCIA') b.push('<button class="btn-mini" onclick="reintentarDte('+d.id+')">Reintentar envío</button>');
     return b.join('');
@@ -676,7 +750,11 @@
 
   /* --- Anular (invalidación) --- */
   var anularId = null;
+  /** Misma política que la API (backend/src/config/politicas.js · ROLES_INVALIDAR); la API es la que manda (403). */
+  var ROLES_INVALIDAR = ['ADMIN'];
+  function puedeInvalidar(){ return !!usuarioActual && ROLES_INVALIDAR.indexOf(usuarioActual.rol)!==-1; }
   function abrirAnular(id){
+    if(!puedeInvalidar()){ toast('Tu rol no permite anular documentos','warn'); return; }
     var d = dtes.filter(function(x){return x.id===id})[0] || (ultimaEmision && ultimaEmision.emision.id===id ? ultimaEmision.emision : null);
     anularId = id;
     document.getElementById('an-doc').textContent = d ? d.numeroControl : ('DTE #'+id);

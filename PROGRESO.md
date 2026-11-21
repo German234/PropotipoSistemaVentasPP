@@ -22,6 +22,8 @@
 - **C3 Cola de consultas a MH — HECHO (2026-11-06).** `X-Simular: timeout` (MH recibió pero la respuesta se perdió); durante el día se consulta en MH un DTE en contingencia por turno (round-robin, intervalo configurable) y los que MH sí tenía quedan PROCESADO con su sello original; consulta puntual `POST /api/dte/:id/consultar`. 309 pruebas en verde. Cambio de contrato (ver abajo).
 - **P1 PDF real del DTE — HECHO (2026-11-06).** `GET /api/dte/:id/pdf` genera la representación gráfica con la plantilla del PDF de ejemplo; "Descargar PDF" (modal de correo en Transacciones) la descarga. Cambio de contrato (ver abajo).
 - **P2 Datos completos del cliente con catálogos MH — HECHO (2026-11-06).** El formulario de clientes selecciona departamento → municipio → distrito (CAT-012/013, reforma 2024) y tipo de documento (CAT-022); captura nombre comercial y teléfono; el backend valida los códigos y los copia al receptor del DTE. Nuevo `GET /api/catalogos`. Cambio de contrato (ver abajo).
+- **S1 Autorización de invalidación — HECHO (2026-11-20).** `POST /api/dte/:id/invalidar` solo para `ADMIN` (`requireRol` + política `ROLES_INVALIDAR`); VENDEDOR → 403 `SIN_PERMISO`; la UI oculta "Anular" a quien no tiene permiso. **Decisión de negocio pendiente de validar con el Product Owner** (¿qué roles pueden invalidar?). 329 pruebas en verde. Cambio de contrato (ver abajo).
+- **KAN-34 Edición de clientes — HECHO (2026-11-20).** Botón Editar por cliente, formulario en modo edición con catálogos MH en cascada, `PUT /api/clientes/:id`, actualización de la fila sin recargar. 346 pruebas en verde. Sin cambios de contrato.
 - ✅ **MVP COMPLETO (2026-11-04).** Backend B1–B4 + frontend F1–F4 integrados: login con roles, catálogos, emisión 01/03/05, invalidación, contingencia y reintento, transacciones y bitácora, todo contra SQL Server. Guion de demo verificado de punta a punta.
 
 ## Mapa de archivos
@@ -40,6 +42,7 @@
 | `backend/src/server.js` | Carga `.env`, levanta el servidor y arranca los temporizadores del lote automático y de la cola de consultas a MH |
 | `backend/src/app.js` | Express: cors, json, rutas `/api/*`, 404 API, estáticos de `frontend/`, manejador de errores. **Registrar aquí las rutas nuevas** |
 | `backend/src/config/db.js` | Pool mssql lazy; `query(sql, params)`; `withTransaction(async ({tx, query}) => ...)` |
+| `backend/src/config/politicas.js` | Políticas de autorización por operación: `ROLES_INVALIDAR = ['ADMIN']` (pendiente de validar con el PO) |
 | `backend/src/utils/respuesta.js` | `AppError(codigo, mensaje, status)`, `ok(res, data, status)`, `asyncHandler(fn)` |
 | `backend/src/middleware/errores.js` | `noEncontrado` (404) y `manejadorErrores` → `{ok:false,error:{codigo,mensaje}}` |
 | `backend/src/routes/health.js` | `GET /api/health` (SELECT 1) |
@@ -133,6 +136,11 @@
   - Bug corregido: `utils/dinero.js` `redondear2` devolvía `NaN` con residuos en notación exponencial (`4.4e-16`) → NC de 3 de 10 × $1.10 respondía 500. Ahora < 0.005 → 0. Con pruebas de regresión.
   - Matriz requisito → prueba en `docs/PRUEBAS.md`. Pendiente (fuera de alcance): pruebas automatizadas del frontend.
 
+- [x] **S1 — Autorización de invalidación (2026-11-20).**
+  - Archivos: nuevo `backend/src/config/politicas.js`; modificados `routes/dte.js` (`requireRol(...ROLES_INVALIDAR)` en `/:id/invalidar`), `tests/integration/invalidacion.test.js` (la prueba "VENDEDOR puede invalidar" pasa a: sin token 401 / VENDEDOR 403 sin efectos en estado, stock ni bitácora / ADMIN funcional), `frontend/js/app.js` (`puedeInvalidar()` oculta "Anular" en Transacciones y en el modal del DTE; guarda en `abrirAnular`), `frontend/js/mocks.js` (`requireAdmin` en invalidar), `docs/API.md`.
+  - Decisiones: la autorización va antes de buscar el DTE (VENDEDOR recibe 403 aunque el id no exista); un intento denegado no se registra en bitácora (igual que los demás 403). La lista de roles del frontend replica la del backend; la API es la fuente de verdad.
+  - Pendiente: **validar con el Product Owner** qué roles pueden invalidar (hoy solo ADMIN); si cambia, editar `ROLES_INVALIDAR` en `politicas.js` y en `app.js`.
+
 ## Frontend (F1–F4)
 
 Plan propuesto (ajustable):
@@ -152,7 +160,13 @@ Plan propuesto (ajustable):
   - Clientes: panel `v-clientes` con búsqueda `q` + filtro `tipo` y alta; NIT/NRC/cód. y desc. de actividad solo visibles si tipo = CONTRIBUYENTE (validación de presencia local; formato lo valida la API). Cualquier rol puede crear.
   - Errores: `alertaError(e)` → `toast(e.mensaje,'warn')` (componente de alertas del prototipo). Texto de la API escapado con `_h()`.
   - Verificado en Edge headless con mocks: 30 comprobaciones (login fallido/ok, rol, ocultar admin, permisos 403, búsqueda, crear/editar/desactivar producto, código repetido, clientes con/sin contribuyente, NIT inválido, filtro, logout, token inválido).
-  - ~~Pendiente F3~~ (resuelto en F3): el carrito aún calcula IVA como subtotal × 0.13 sin distinguir 01/03; el form de cliente de Nueva venta sigue siendo libre (F3 debe elegir un cliente de `clientes`/API). Editar clientes no está en la UI (la API lo soporta).
+  - ~~Pendiente F3~~ (resuelto en F3): el carrito aún calcula IVA como subtotal × 0.13 sin distinguir 01/03; el form de cliente de Nueva venta sigue siendo libre (F3 debe elegir un cliente de `clientes`/API). ~~Editar clientes no está en la UI~~ (hecho en KAN-34).
+- [x] **KAN-34 — Edición de clientes en la UI (2026-11-20).**
+  - Archivos: `index.html` (columna de acciones con ✏️ en la tabla de clientes, `#cli-form-title`, botón `#cli-cancel`; el botón guardar llama `guardarCliente()`), `js/app.js` (`editarCliente(id)`, `limpiarFormCliente()`, `reemplazarCliente(c)`; `crearCliente` → `guardarCliente` que crea o actualiza), `backend/tests/integration/catalogos.test.js` (bloque *Clientes · edición (KAN-34)*, 17 pruebas).
+  - Flujo: ✏️ → `GET /api/clientes/:id` (datos vigentes) → el mismo formulario en modo edición, con depto → municipio → distrito cargados en cascada → `api.clientes.actualizar(id, datos)` → se reemplaza la fila en `clientes` y en `clientesVenta` (sin volver a listar) y se repinta el selector de Nueva venta.
+  - Validaciones: se conservan las locales de alta (nombre, dirección completa, NIT/NRC/actividad del contribuyente, número de documento) y las de la API (`normalizar`); el error 400 se muestra como "No se pudo actualizar: <mensaje de la API>" y el formulario sigue en edición.
+  - Decisiones: al editar un consumidor no se envían `nrc`/`codActividad`/`descActividad` (no están en su formulario; la API conserva los actuales). Una dirección anterior a P2 (solo texto) que no se toca no se envía, y la API la conserva. Sin cambios de contrato ni de backend.
+  - Verificado: 346/346 pruebas; recorrido en Edge headless contra la API real (BD de pruebas): alta consumidor/contribuyente, editar, NRC/actividad inválidos, edición válida, fila actualizada sin listar de nuevo, GET del cliente, CCF emitido con el receptor editado, cancelar; sin errores JS.
 
 ### Mapa del prototipo (no releer los archivos completos)
 
@@ -270,6 +284,7 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
 
 ## Cambios de contrato
 
+- S1: `POST /api/dte/:id/invalidar` pasa de "cualquier rol autenticado" a solo `ADMIN`; otro rol → 403 `SIN_PERMISO`.
 - P2: clientes con `nombreComercial`, `tipoDocumento`, `numDocumento`, `telefono` y `direccion` **objeto** `{departamento, municipio, distrito, complemento}` con códigos MH validados (antes texto libre); CONTRIBUYENTE exige dirección completa y `codActividad` de 5–6 dígitos (antes 2–6). Nuevo `GET /api/catalogos`. `GET /api/emisor` agrega `direccion.distrito` (seed: municipio 23 San Salvador Centro, distrito 14). El receptor del DTE lleva documento, teléfono, nombre comercial (03) y la dirección del cliente.
 - P1: nuevo `GET /api/dte/:id/pdf` (cualquier rol) → `application/pdf` (no JSON; errores sí en JSON estándar).
 - C3: `X-Simular` admite `timeout` (para el POS = contingencia; MH sí guardó el DTE; en eventos = sin respuesta). Nuevos `POST /api/dte/:id/consultar` (cualquier rol), `GET /api/contingencia/consultas` (cualquier rol) y `PUT` (ADMIN, `{activo?, intervaloSeg?}`). `GET /api/dte/:id` agrega `consultaMh`. Reintento/lote de un DTE que MH ya tenía → sello original (con `observaciones`) y JSON de modelo previo. Bitácora: acción `CONSULTA_MH`; `ACTUALIZAR` con entidad `consultas_mh`.
@@ -292,11 +307,11 @@ Roles de UI del prototipo: vendedor / gerente / admin. La API solo tiene `ADMIN`
   - Decisiones: los catálogos viven en código (no en BD) porque son fijos; un solo archivo UMD para backend y mocks. Distrito = código del antiguo municipio dentro del departamento. Clientes anteriores a P2 (solo texto) siguen funcionando: el DTE usa los códigos del emisor. Actividad económica (CAT-019, ~770 códigos) sigue como código + descripción libres.
   - UI: selects encadenados Departamento → Municipio → Distrito + Complemento (obligatorios para contribuyente); tipo/número de documento para consumidor; nombre comercial y teléfono; columnas Documento y Ubicación en la lista; resumen del cliente en Nueva venta con documento, teléfono y dirección completa.
   - Verificado: 326/326 pruebas; mocks emitiendo 01/03 válidos contra `fe-f-v2`/`fe-ccf-v4`; recorrido en Edge headless contra la API real (crear contribuyente en San Miguel Centro, CCF con receptor 12/22/17, PDF) sin errores JS.
-  - Pendiente: edición de clientes en la UI; validar los códigos de distrito contra el CAT oficial vigente del MH.
+  - Pendiente: ~~edición de clientes en la UI~~ (KAN-34); validar los códigos de distrito contra el CAT oficial vigente del MH.
 
 ## Pendientes
 
 - **Antes de la demo:** la BD local tiene los datos de las pruebas de C1 (DTE 3–10, 6 eventos de contingencia, bitácora y stock de P001, P002, P003, P005, P006 movidos). Ejecutar `sqlcmd -S localhost -E -C -f 65001 -i db/03_reset_demo.sql` para que los números de control empiecen en 001, como en `docs/DEMO.md`.
-- Fuera del MVP (simulado o fijo en la UI): panel gerencial, usuarios y configuración del admin, borradores, envío por correo, anulación tipo 1/3 en la UI, edición de clientes en la UI, descuentos por línea en la UI.
+- Fuera del MVP (simulado o fijo en la UI): panel gerencial, usuarios y configuración del admin, borradores, envío por correo, anulación tipo 1/3 en la UI, descuentos por línea en la UI.
 - ~~`/api/health` en verde con `sa`~~ (hecho en B3).
 - Ninguno en backend. Opcional: reintentar invalidación más tarde si MH no responde (hoy el cliente simplemente repite la llamada).

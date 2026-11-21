@@ -637,12 +637,12 @@
                 </select></div>
               </div>
               <table>
-                <thead><tr><th>Nombre</th><th>Tipo</th><th>Documento</th><th>NRC</th><th>Ubicación</th><th>Correo</th></tr></thead>
+                <thead><tr><th>Nombre</th><th>Tipo</th><th>Documento</th><th>NRC</th><th>Ubicación</th><th>Correo</th><th></th></tr></thead>
                 <tbody id="cli-tbody"></tbody>
               </table>
             </div>
             <div class="card card-pad">
-              <div class="card-title">Nuevo cliente</div>
+              <div class="card-title" id="cli-form-title">Nuevo cliente</div>
               <div class="field"><label>Tipo <span class="req">*</span></label><select id="cli-tipo" onchange="toggleCamposContribuyente()">
                 <option value="CONSUMIDOR">Consumidor final</option><option value="CONTRIBUYENTE">Contribuyente</option>
               </select></div>
@@ -671,7 +671,8 @@
               <div class="field"><label>Municipio</label><select id="cli-municipio" onchange="cambiarMunicipio()" disabled></select></div>
               <div class="field"><label>Distrito</label><select id="cli-distrito" disabled></select></div>
               <div class="field"><label>Complemento</label><input id="cli-complemento" placeholder="Colonia, calle, número de casa…"></div>
-              <button class="btn btn-primary btn-block" id="cli-save" style="margin-top:6px" onclick="crearCliente()">+ Guardar cliente</button>
+              <button class="btn btn-primary btn-block" id="cli-save" style="margin-top:6px" onclick="guardarCliente()">+ Guardar cliente</button>
+              <button class="btn btn-ghost btn-block" id="cli-cancel" style="margin-top:8px;display:none" onclick="limpiarFormCliente()">Cancelar edición</button>
             </div>
           </div>
         </div>

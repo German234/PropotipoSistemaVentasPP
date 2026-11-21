@@ -1,4 +1,5 @@
 /** Productos, clientes y emisor: CRUD, roles, validaciones y normalización. */
+require('../helpers/schemas');
 const { prepararApi, cerrarBd } = require('../helpers/api');
 
 let t;
@@ -158,6 +159,117 @@ describe('Clientes', () => {
   test('PUT revalida el registro completo: quitar el NRC a un CONTRIBUYENTE → 400', async () => {
     const r = await t.admin('put', `/api/clientes/${t.cli.libreria.id}`).send({ nrc: null });
     expect(r.status).toBe(400);
+  });
+});
+
+describe('Clientes · edición (KAN-34)', () => {
+  const DIR_SS = { departamento: '06', municipio: '23', distrito: '14', complemento: 'Col. Escalón #10' };
+  const DIR_ST = { departamento: '05', municipio: '28', distrito: '10', complemento: 'Santa Tecla, calle 5' };
+  /** Cuerpo completo, tal como lo manda el formulario de la UI al editar un contribuyente. */
+  const formContrib = (cambios = {}) => ({
+    tipo: 'CONTRIBUYENTE', nombre: 'Editable QA, S.A. de C.V.', nombreComercial: 'Editable', tipoDocumento: null, numDocumento: null,
+    nit: '06142301001240', nrc: '2222', codActividad: '46900', descActividad: 'Venta al por mayor',
+    telefono: '2222-3333', correo: 'editable@correo.com', direccion: DIR_SS, ...cambios,
+  });
+
+  let contrib;
+  let consumidor;
+  beforeAll(async () => {
+    contrib = (await t.vendedor('post', '/api/clientes').send(formContrib())).body.data;
+    consumidor = (await t.vendedor('post', '/api/clientes').send({ tipo: 'CONSUMIDOR', nombre: 'Consumidor Edit QA' })).body.data;
+  });
+
+  test('registro de consumidor final y de contribuyente (201)', () => {
+    expect(consumidor).toMatchObject({ tipo: 'CONSUMIDOR', nombre: 'Consumidor Edit QA', direccion: null });
+    expect(contrib).toMatchObject({ tipo: 'CONTRIBUYENTE', nit: '06142301001240', nrc: '2222', tipoDocumento: '36', direccion: DIR_SS });
+  });
+
+  test('VENDEDOR edita un contribuyente: datos fiscales, contacto y dirección (200) y queda en bitácora', async () => {
+    const r = await t.vendedor('put', `/api/clientes/${contrib.id}`).send(formContrib({
+      nombre: 'Editable QA Renombrada', nombreComercial: 'Editable 2', nit: '0614-230100-124-1', nrc: '333-3',
+      codActividad: '47190', descActividad: 'Venta al por menor', telefono: '2222-4444', correo: 'nuevo@correo.com', direccion: DIR_ST,
+    }));
+    expect(r.status).toBe(200);
+    expect(r.body.data).toMatchObject({
+      id: contrib.id, nombre: 'Editable QA Renombrada', nombreComercial: 'Editable 2', nit: '06142301001241', numDocumento: '06142301001241',
+      nrc: '3333', codActividad: '47190', telefono: '2222-4444', correo: 'nuevo@correo.com', direccion: DIR_ST, activo: true,
+    });
+    const b = await t.bitacora({ accion: 'ACTUALIZAR', entidad: 'cliente' });
+    expect(b.some((x) => x.entidadId === contrib.id && x.usuario === 'vendedor')).toBe(true);
+  });
+
+  test('consulta del cliente actualizado: GET /:id y búsqueda por el nuevo NIT', async () => {
+    const g = await t.vendedor('get', `/api/clientes/${contrib.id}`);
+    expect(g.body.data).toMatchObject({ nombre: 'Editable QA Renombrada', nrc: '3333', direccion: DIR_ST });
+    const l = await t.vendedor('get', '/api/clientes').query({ q: '06142301001241' });
+    expect(l.body.data.map((c) => c.id)).toEqual([contrib.id]);
+  });
+
+  test('consumidor: agregar DUI y dirección; luego quitarlos (null)', async () => {
+    const a = await t.vendedor('put', `/api/clientes/${consumidor.id}`).send({ tipoDocumento: '13', numDocumento: '04567890-1', direccion: DIR_SS });
+    expect(a.status).toBe(200);
+    expect(a.body.data).toMatchObject({ tipoDocumento: '13', numDocumento: '045678901', nit: null, direccion: DIR_SS });
+    const b = await t.vendedor('put', `/api/clientes/${consumidor.id}`).send({ tipoDocumento: null, numDocumento: null, direccion: null });
+    expect(b.body.data).toMatchObject({ tipoDocumento: null, numDocumento: null, direccion: null });
+  });
+
+  test('consumidor → contribuyente: exige los datos fiscales; con ellos pasa a documento NIT', async () => {
+    const sin = await t.vendedor('put', `/api/clientes/${consumidor.id}`).send({ tipo: 'CONTRIBUYENTE' });
+    expect(sin.status).toBe(400);
+    const con = await t.vendedor('put', `/api/clientes/${consumidor.id}`).send(formContrib({ nombre: 'Consumidor Edit QA', nit: '06142301001242' }));
+    expect(con.status).toBe(200);
+    expect(con.body.data).toMatchObject({ tipo: 'CONTRIBUYENTE', tipoDocumento: '36', numDocumento: '06142301001242' });
+  });
+
+  test.each([
+    ['NIT con 10 dígitos', { nit: '0614230100' }, /nit/],
+    ['NRC con letras', { nrc: '12A' }, /nrc/],
+    ['NRC de 9 dígitos', { nrc: '123456789' }, /nrc/],
+    ['actividad de 3 dígitos', { codActividad: '469' }, /codActividad/],
+    ['sin descripción de actividad', { descActividad: '' }, /descActividad/],
+    ['sin dirección', { direccion: null }, /direccion/],
+    ['municipio de otro departamento', { direccion: { ...DIR_SS, municipio: '05' } }, /no pertenece al departamento/],
+    ['correo inválido', { correo: 'sin-arroba' }, /correo/],
+  ])('rechaza datos inválidos al editar (%s) → 400 VALIDACION y no cambia nada', async (_, cambios, msg) => {
+    const r = await t.vendedor('put', `/api/clientes/${contrib.id}`).send(formContrib({ nombre: 'NO DEBE GUARDARSE', ...cambios }));
+    expect(r.status).toBe(400);
+    expect(r.body).toMatchObject({ ok: false, error: { codigo: 'VALIDACION', mensaje: expect.stringMatching(msg) } });
+    const g = await t.vendedor('get', `/api/clientes/${contrib.id}`);
+    expect(g.body.data).toMatchObject({ nombre: 'Editable QA Renombrada', nit: '06142301001241', nrc: '3333', direccion: DIR_ST });
+  });
+
+  test('consumidor: tipo de documento fuera del CAT-022 o DUI mal formado → 400', async () => {
+    const otro = (await t.vendedor('post', '/api/clientes').send({ tipo: 'CONSUMIDOR', nombre: 'Doc QA' })).body.data;
+    expect((await t.vendedor('put', `/api/clientes/${otro.id}`).send({ tipoDocumento: '99', numDocumento: '1' })).status).toBe(400);
+    expect((await t.vendedor('put', `/api/clientes/${otro.id}`).send({ tipoDocumento: '13', numDocumento: '1234' })).status).toBe(400);
+    expect((await t.vendedor('put', `/api/clientes/${otro.id}`).send({ tipoDocumento: '13', numDocumento: null })).status).toBe(400);
+  });
+
+  test('PUT a un cliente inexistente → 404', async () => {
+    expect((await t.vendedor('put', '/api/clientes/999999').send({ nombre: 'x' })).status).toBe(404);
+  });
+
+  test('el cliente editado se asocia a una venta: el CCF lleva los datos nuevos en el receptor', async () => {
+    const prod = t.prod.P001.id;
+    const r = await t.emitir('03', { clienteId: contrib.id, items: [{ productoId: prod, cantidad: 1 }] }, undefined, t.vendedor);
+    expect(r.status).toBe(201);
+    const d = await t.detalle(r.body.data.id);
+    expect(d.jsonDte).toCumplirEsquemaMh('03');
+    expect(d.jsonDte.receptor).toMatchObject({
+      nit: '06142301001241', nrc: '3333', codActividad: '47190', descActividad: 'Venta al por menor',
+      nombre: 'Editable QA Renombrada', nombreComercial: 'Editable 2', correo: 'nuevo@correo.com', direccion: DIR_ST,
+    });
+    expect(d.cliente).toMatchObject({ id: contrib.id, tipo: 'CONTRIBUYENTE' });
+  });
+
+  test('un consumidor editado (DUI) aparece como receptor de la Factura 01', async () => {
+    const c = (await t.vendedor('post', '/api/clientes').send({ tipo: 'CONSUMIDOR', nombre: 'Factura QA' })).body.data;
+    await t.vendedor('put', `/api/clientes/${c.id}`).send({ nombre: 'Factura QA Editado', tipoDocumento: '13', numDocumento: '01234567-8', direccion: DIR_SS });
+    const r = await t.emitir('01', { clienteId: c.id, items: [{ productoId: t.prod.P002.id, cantidad: 1 }] });
+    expect(r.status).toBe(201);
+    const d = await t.detalle(r.body.data.id);
+    expect(d.jsonDte).toCumplirEsquemaMh('01');
+    expect(d.jsonDte.receptor).toMatchObject({ nombre: 'Factura QA Editado', tipoDocumento: '13', numDocumento: '01234567-8', direccion: DIR_SS });
   });
 });
 

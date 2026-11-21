@@ -181,10 +181,50 @@ describe('Invalidación · tipos de anulación y validaciones', () => {
     expect((await t.invalidar(999999, MOTIVO)).status).toBe(404);
   });
 
-  test('VENDEDOR también puede invalidar (cualquier rol autenticado)', async () => {
-    const g = (await t.emitir('01', { items: [linea('P005', 1)] })).body.data;
+});
+
+describe('Invalidación · autorización (política ROLES_INVALIDAR = ADMIN)', () => {
+  let g;
+  let stock;
+  beforeAll(async () => {
+    g = (await t.emitir('01', { items: [linea('P005', 2)] })).body.data;
+    stock = await t.stock('P005');
+  });
+
+  /** Un intento rechazado no debe tocar el DTE, el stock ni registrar INVALIDACION en bitácora. */
+  async function sinEfectos() {
+    const d = await t.detalle(g.id);
+    expect(d.estado).toBe('PROCESADO');
+    expect(d.invalidacion).toBeFalsy();
+    expect(await t.stock('P005')).toBe(stock);
+    expect(await t.bitacora({ accion: 'INVALIDACION', dteId: g.id })).toHaveLength(0);
+  }
+
+  test('sin token → 401 NO_AUTENTICADO', async () => {
+    const r = await t.request(t.app).post(`/api/dte/${g.id}/invalidar`).send(MOTIVO);
+    expect(r.status).toBe(401);
+    expect(r.body).toMatchObject({ ok: false, error: { codigo: 'NO_AUTENTICADO' } });
+    await sinEfectos();
+  });
+
+  test('VENDEDOR → 403 SIN_PERMISO con el formato estándar de error', async () => {
     const r = await t.vendedor('post', `/api/dte/${g.id}/invalidar`).send(MOTIVO);
+    expect(r.status).toBe(403);
+    expect(r.body).toEqual({ ok: false, error: { codigo: 'SIN_PERMISO', mensaje: expect.any(String) } });
+    await sinEfectos();
+  });
+
+  test('VENDEDOR sobre un DTE inexistente también → 403 (la autorización va antes que la búsqueda)', async () => {
+    expect((await t.vendedor('post', '/api/dte/999999/invalidar').send(MOTIVO)).status).toBe(403);
+  });
+
+  test('ADMIN sobre el mismo DTE → 200, INVALIDADO, stock devuelto y bitácora', async () => {
+    const r = await t.invalidar(g.id, MOTIVO);
     expect(r.status).toBe(200);
-    expect(r.body.data.jsonEvento.motivo.nombreResponsable).toBe('Vendedor de Turno');
+    expect(r.body.data).toMatchObject({ estado: 'INVALIDADO', estadoEvento: 'PROCESADO' });
+    expect(await t.stock('P005')).toBe(stock + 2);
+    const b = await t.bitacora({ accion: 'INVALIDACION', dteId: g.id });
+    expect(b).toHaveLength(1);
+    expect(b[0]).toMatchObject({ resultado: 'PROCESADO' });
   });
 });
