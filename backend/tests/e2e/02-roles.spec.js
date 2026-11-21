@@ -31,7 +31,7 @@ test.describe('Restricciones por rol', () => {
     await captura(page, 'rol-vendedor-sin-anular');
   });
 
-  test('VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia)', async ({ page }) => {
+  test('VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia, leer la bitácora)', async ({ page }) => {
     await login(page, 'vendedor', 'vendedor123');
     const lista = await (await page.request.get('/api/dte?estado=PROCESADO')).json();
     const id = lista.data[0].id;
@@ -46,6 +46,10 @@ test.describe('Restricciones por rol', () => {
     }
     const det = await (await page.request.get(`/api/dte/${id}`)).json();
     expect(det.data.estado).toBe('PROCESADO');
+    // KAN-36: la bitácora de auditoría solo la lee ADMIN
+    const bit = await page.request.get('/api/bitacora');
+    expect(bit.status(), 'GET /api/bitacora').toBe(403);
+    expect((await bit.json()).error.codigo).toBe('SIN_PERMISO');
   });
 
   test('ADMIN: ve Contingencia, Administración, Simular MH y "Anular"', async ({ page }) => {
@@ -57,5 +61,10 @@ test.describe('Restricciones por rol', () => {
     await irA(page, 'v-historial');
     await expect(page.locator('#h-tbody tr').getByRole('button', { name: 'Anular' }).first()).toBeVisible();
     await captura(page, 'rol-admin-transacciones');
+    // KAN-36: ADMIN lee la bitácora (API 200 y panel de Administración con filas)
+    expect((await page.request.get('/api/bitacora')).status()).toBe(200);
+    await menu.getByRole('button', { name: /Administración/ }).click();
+    await page.locator('#sb-admin button[data-panel="a-bitacora"]').click();
+    await expect(page.locator('#b-tbody tr').first()).toContainText(/vendedor|admin/);
   });
 });

@@ -1,6 +1,6 @@
 # Matriz de trazabilidad: requisito → prueba → resultado
 
-> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:04:43 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
+> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:38:01 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
 
 | ID | Requisito | Fuente | Pruebas (archivo: casos) | Resultado |
 |---|---|---|---|---|
@@ -27,15 +27,15 @@
 | RQ-CON-07 | Tareas programadas persistentes tras reinicio, sin duplicados, con registro | Fase 5 | `integration/tareasProgramadas.test.js`: 15/15 | ✅ 15/15 |
 | RQ-CON-08 | UI: emisión en contingencia → lote → PROCESADO; reintento desde Transacciones | Fase C1/C2 | `e2e/06-contingencia.spec.js`: 2/2 | ✅ 2/2 |
 | RQ-INV-01 | Invalidación solo de PROCESADO; 03 con NC vigente no se invalida; evento v3 con sello; devuelve stock | CLAUDE.md | `integration/invalidacion.test.js`: 20/20 | ✅ 20/20 |
-| RQ-INV-02 | Invalidar solo ADMIN (S1) | Fase S1 | `integration/autorizacion.test.js`: 4/4<br>`integration/invalidacion.test.js`: 4/4 | ✅ 8/8 |
+| RQ-INV-02 | Invalidar solo ADMIN (S1) | Fase S1 | `integration/invalidacion.test.js`: 4/4<br>`integration/autorizacion.test.js`: 4/4 | ✅ 8/8 |
 | RQ-INV-03 | UI: anular desde Transacciones y descargar el PDF real | Fase F4/P1 | `integration/pdf.test.js`: 6/6<br>`e2e/05-invalidacion-pdf.spec.js`: 2/2 | ✅ 8/8 |
 | RQ-CAT-01 | Productos: CRUD solo ADMIN; clientes con catálogos MH y edición | API.md / P2 / KAN-34 | `integration/catalogos.test.js`: 40/40 | ✅ 40/40 |
 | RQ-CAT-02 | UI: alta y edición de clientes con validación fiscal | KAN-34 | `e2e/03-clientes.spec.js`: 2/2 | ✅ 2/2 |
 | RQ-UI-01 | UI: venta y emisión de 01 y 03 desde Nueva venta | Fase F3 | `e2e/04-venta-dte.spec.js`: 3/3 | ✅ 3/3 |
-| RQ-UI-02 | Listados, detalle de DTE y bitácora | API.md | `integration/consultas.test.js`: 17/17 | ✅ 17/17 |
+| RQ-UI-02 | Listados, detalle de DTE y bitácora | API.md | `integration/consultas.test.js`: 22/22 | ✅ 22/22 |
 | RQ-SEG-01 | Toda ruta salvo health/login/logout exige sesión (40 rutas protegidas) | CLAUDE.md / SEGURIDAD.md | `integration/autorizacion.test.js`: 41/41 | ✅ 41/41 |
 | RQ-SEG-02 | Token manipulado, sin firma (alg none) o de otro secreto → 401; el rol sale solo del token | SEGURIDAD.md | `integration/autorizacion.test.js`: 4/4<br>`unit/middleware.test.js`: 6/6 | ✅ 10/10 |
-| RQ-SEG-03 | Rutas de solo ADMIN → 403 a VENDEDOR sin efectos (Bearer y cookie+CSRF) | SEGURIDAD.md | `integration/autorizacion.test.js`: 23/23 | ✅ 23/23 |
+| RQ-SEG-03 | Rutas de solo ADMIN → 403 a VENDEDOR sin efectos (Bearer y cookie+CSRF) | SEGURIDAD.md | `integration/autorizacion.test.js`: 25/25 | ✅ 25/25 |
 | RQ-SEG-04 | Rutas de cualquier rol sin 403 para VENDEDOR; ADMIN autorizado en las suyas | SEGURIDAD.md | `integration/autorizacion.test.js`: 40/40 | ✅ 40/40 |
 | RQ-SEG-05 | Sesión en cookie HttpOnly + CSRF | SEGURIDAD.md §4 | `integration/seguridad.test.js`: 8/8<br>`unit/middleware.test.js`: 6/6 | ✅ 14/14 |
 | RQ-SEG-06 | Límite de intentos de login (429) | SEGURIDAD.md §3 | `integration/seguridad.test.js`: 6/6 | ✅ 6/6 |
@@ -45,10 +45,11 @@
 | RQ-SEG-10 | UI oculta lo de ADMIN al VENDEDOR y la API lo rechaza | Fase F2/S1 | `e2e/02-roles.spec.js`: 4/4 | ✅ 4/4 |
 | RQ-SEG-11 | Login, cookie HttpOnly sin JWT en almacenamiento, recarga y logout (UI) | SEGURIDAD.md §4 | `e2e/01-login.spec.js`: 3/3 | ✅ 3/3 |
 | RQ-SEG-12 | Reset de la demo restaura datos del seed (D1) | Fase 4 | `integration/resetDemo.test.js`: 1/1 | ✅ 1/1 |
+| RQ-SEG-13 | Bitácora: solo ADMIN la lee (VENDEDOR → 403, ADMIN → 200) y se siguen registrando las acciones del VENDEDOR | KAN-32 / KAN-36 | `integration/autorizacion.test.js`: 4/4<br>`integration/consultas.test.js`: 5/5<br>`e2e/02-roles.spec.js`: 2/2 | ✅ 11/11 |
 | RQ-F6-01 | Usuarios: CRUD solo ADMIN, sin hash, no auto-desactivarse, siempre un ADMIN activo | Fase 6 | `integration/fase6.test.js`: 14/14<br>`e2e/07-fase6.spec.js`: 1/1 | ✅ 15/15 |
 | RQ-F6-02 | Borradores por usuario (ajeno → 404), total estimado, se eliminan al emitir | Fase 6 | `integration/fase6.test.js`: 10/10<br>`e2e/07-fase6.spec.js`: 1/1 | ✅ 11/11 |
 | RQ-F6-03 | Correo SIMULADO: enviado:false, bitácora; la UI nunca dice "enviado" | Fase 6 | `integration/fase6.test.js`: 2/2<br>`e2e/07-fase6.spec.js`: 1/1 | ✅ 3/3 |
 | RQ-F6-04 | Reportes gerenciales con DTE reales (solo ADMIN) | Fase 6 | `integration/fase6.test.js`: 10/10<br>`e2e/07-fase6.spec.js`: 1/1 | ✅ 11/11 |
 | RQ-F6-05 | Configuración: emisor real de solo lectura; firmador identificado como simulado | Fase 6 | `integration/catalogos.test.js`: 1/1<br>`e2e/07-fase6.spec.js`: 1/1 | ✅ 2/2 |
 
-**46 de 46 requisitos con todas sus pruebas aprobadas.** Un caso puede respaldar más de un requisito.
+**47 de 47 requisitos con todas sus pruebas aprobadas.** Un caso puede respaldar más de un requisito.

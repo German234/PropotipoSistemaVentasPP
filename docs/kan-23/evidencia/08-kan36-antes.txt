@@ -1,0 +1,15 @@
+KAN-36 · ANTES de la corrección (routes/bitacora.js con router.use(auth), sin requireRol): pruebas nuevas contra la ruta original
+Resultado: 126 aprobadas, 6 fallidas de 132 (2 suites).
+Fallidas:
+  ✕ integration/autorizacion.test.js › VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · GET /api/bitacora
+      Expected: 403 · Received: 200
+  ✕ integration/autorizacion.test.js › VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/bitacora
+      Expected: 403 · Received: 200
+  ✕ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (sin filtros), sin datos en la respuesta
+      Expected: 403 · Received: 200
+  ✕ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (filtrando por su propio usuario), sin datos en la respuesta
+      Expected: 403 · Received: 200
+  ✕ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (por DTE), sin datos en la respuesta
+      Expected: 403 · Received: 200
+  ✕ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › las acciones del VENDEDOR se siguen registrando (y ADMIN las ve); el intento denegado no deja rastro
+      Expected: 403 · Received: 200

@@ -2,7 +2,7 @@
 
 Dos niveles en `backend/tests/`:
 
-- **Jest + Supertest + Ajv** (backend): **539 pruebas en 24 suites** (110 unitarias en 7 suites, 429 de integración en 17), todas aprobadas. Cobertura del backend: **96.72 % sentencias, 84.86 % ramas, 98.34 % funciones, 98.45 % líneas** (Fase 7).
+- **Jest + Supertest + Ajv** (backend): **546 pruebas en 24 suites** (110 unitarias en 7 suites, 436 de integración en 17), todas aprobadas. Cobertura del backend: **96.73 % sentencias, 84.86 % ramas, 98.34 % funciones, 98.45 % líneas** (Fase 7, tras KAN-36).
 - **Playwright** (frontend contra la API real): **21 pruebas e2e en 7 archivos**, todas aprobadas.
 
 Las cifras son de la Fase 7 (hito **KAN-23**, 2026-11-20), con evidencia completa en [`docs/kan-23/`](kan-23/README.md): salidas, cobertura, reporte e2e con capturas, pruebas de mutación, matrices de trazabilidad y de autorización generadas desde los resultados (`tests/tools/reporteKan23.js`). La evidencia anterior (Fase 4, 458 pruebas) sigue en [`docs/qa/2026-11-20/`](qa/2026-11-20/INFORME.md), con salidas, capturas y reportes. Las cifras anteriores que aparecen en `PROGRESO.md` (256, 281, 309, 326, 329, 346, 383) son históricas, de cada bloque.
@@ -39,7 +39,7 @@ npm run test:e2e       # frontend con Playwright y Edge, ~45 s (levanta su propi
 | `tests/unit/contingencia.test.js` | Unitaria | `enContingencia` (tipoModelo/tipoOperacion 2) en 01/03/05 contra su esquema, builder del evento v4 y MH simulado del evento |
 | `tests/unit/middleware.test.js` | Unitaria | JWT (válido, ausente, otra firma, vencido, `alg: none`), roles, cookie + CSRF, errores 500 sin detalles internos, 413, configuración de seguridad |
 | `tests/integration/auth.test.js` | API + BD | Health, login, 401 en todas las rutas protegidas, 404 de API |
-| `tests/integration/autorizacion.test.js` | API + BD | **Matriz de autorización**: las 40 rutas protegidas sin token (401), token manipulado/sin firma/otro secreto (401), las 11 rutas de solo ADMIN con VENDEDOR por Bearer y por cookie+CSRF (403 sin efectos), las demás sin 403 para ningún rol, ADMIN autorizado |
+| `tests/integration/autorizacion.test.js` | API + BD | **Matriz de autorización**: las 40 rutas protegidas sin token (401), token manipulado/sin firma/otro secreto (401), las 12 rutas de solo ADMIN con VENDEDOR por Bearer y por cookie+CSRF (403 sin efectos), las demás sin 403 para ningún rol, ADMIN autorizado |
 | `tests/integration/seguridad.test.js` | API + BD | CORS por lista, cabeceras/CSP, cookie HttpOnly + CSRF, límite de intentos de login (429), 500/503 sin detalles, 413, credenciales demo solo en local |
 | `tests/integration/resetDemo.test.js` | API + BD | `db/03_reset_demo.sql` restaura los clientes del seed (editados, renombrados, desactivados) y borra los nuevos |
 | `tests/integration/pdf.test.js` | API + BD | `GET /api/dte/:id/pdf`: PDF real de 01/03/05, contingencia, 401/404 |
@@ -53,7 +53,7 @@ npm run test:e2e       # frontend con Playwright y Edge, ~45 s (levanta su propi
 | `tests/integration/tareasProgramadas.test.js` | API + BD + procesos | **Fase 5**: configuración persistente tras reinicios reales del servidor (procesos hijos), temporizador real de la cola, callback del temporizador del lote, candado entre procesos, registro de ejecuciones y errores |
 | `tests/integration/loteContingencia.test.js` | API + BD | **Lote de contingencia**: lote manual y automático (cierre del día), recepción por lote, `GET/PUT /api/contingencia/programacion` |
 | `tests/integration/invalidacion.test.js` | API + BD | **Invalidación** (ok, rechazo, MH sin respuesta, CCF con NC, tipos 1/2/3) |
-| `tests/integration/consultas.test.js` | API + BD | Listado con filtros, detalle y bitácora |
+| `tests/integration/consultas.test.js` | API + BD | Listado con filtros, detalle y bitácora; la bitácora solo la lee ADMIN y sigue registrando las acciones del VENDEDOR (KAN-36) |
 | `tests/e2e/01-login.spec.js` | E2E (Playwright) | Login fallido y correcto, cookie HttpOnly sin JWT en el almacenamiento, recarga, logout |
 | `tests/e2e/02-roles.spec.js` | E2E | La UI oculta lo de ADMIN al VENDEDOR y la API lo rechaza con 403 |
 | `tests/e2e/03-clientes.spec.js` | E2E | Alta de consumidor y contribuyente, edición con catálogo MH, datos fiscales inválidos |
@@ -215,6 +215,7 @@ Requisitos tomados de las reglas DTE y convenciones de `CLAUDE.md` y del contrat
 | Cookie HttpOnly + CSRF en escrituras; CORS por lista; límite de login; errores sin detalles | seguridad (ver `docs/SEGURIDAD.md`), e2e 01-login |
 | Borrado lógico y `incluirInactivos` | catalogos «PUT parcial y borrado lógico» |
 | NIT/NRC normalizados a dígitos | catalogos «NIT/NRC con guiones…» |
+| Bitácora: solo ADMIN la lee (VENDEDOR 403, ADMIN 200); se siguen registrando las acciones de todos los roles (KAN-36 / KAN-32) | consultas «GET /api/bitacora · autorización (KAN-36)», autorizacion (GET /api/bitacora), e2e 02-roles |
 
 ### Pantallas que eran maqueta (Fase 6)
 

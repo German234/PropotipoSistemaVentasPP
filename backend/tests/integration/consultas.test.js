@@ -100,3 +100,35 @@ describe('GET /api/bitacora', () => {
     expect((await t.admin('get', '/api/bitacora').query({ limite: 5000 })).status).toBe(400);
   });
 });
+
+describe('GET /api/bitacora · autorización (KAN-36: solo ADMIN)', () => {
+  test('ADMIN → 200 con la lista', async () => {
+    const r = await t.admin('get', '/api/bitacora');
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(true);
+    expect(Array.isArray(r.body.data)).toBe(true);
+  });
+
+  test.each([
+    ['sin filtros', {}],
+    ['filtrando por su propio usuario', { usuario: 'vendedor' }],
+    ['por DTE', () => ({ dteId: ids.c1 })],
+  ])('VENDEDOR → 403 SIN_PERMISO (%s), sin datos en la respuesta', async (_, q) => {
+    const r = await t.vendedor('get', '/api/bitacora').query(typeof q === 'function' ? q() : q);
+    expect(r.status).toBe(403);
+    expect(r.body).toEqual({ ok: false, error: { codigo: 'SIN_PERMISO', mensaje: expect.stringMatching(/ADMIN/) } });
+  });
+
+  test('las acciones del VENDEDOR se siguen registrando (y ADMIN las ve); el intento denegado no deja rastro', async () => {
+    const antes = (await t.bitacora({ limite: 1000 })).length;
+    const dte = (await t.emitir('01', { items: [{ productoId: t.prod.P001.id, cantidad: 1 }] }, undefined, t.vendedor)).body.data;
+    const cli = (await t.vendedor('post', '/api/clientes').send({ tipo: 'CONSUMIDOR', nombre: 'Cliente KAN-36' })).body.data;
+    expect((await t.vendedor('get', '/api/bitacora')).status).toBe(403);
+    const nuevas = (await t.bitacora({ limite: 1000 })).slice(0, (await t.bitacora({ limite: 1000 })).length - antes);
+    expect(nuevas).toEqual(expect.arrayContaining([
+      expect.objectContaining({ usuario: 'vendedor', accion: 'EMISION', dteId: dte.id, resultado: 'PROCESADO' }),
+      expect.objectContaining({ usuario: 'vendedor', accion: 'CREAR', entidad: 'cliente', entidadId: cli.id }),
+    ]));
+    expect(nuevas).toHaveLength(2); // emisión + alta del cliente; el GET denegado no escribe nada
+  });
+});

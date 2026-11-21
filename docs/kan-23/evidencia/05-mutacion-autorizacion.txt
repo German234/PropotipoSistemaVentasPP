@@ -1,13 +1,13 @@
 ## M1 — Quitar requireRol('ADMIN') de /api/usuarios
    archivo: src/routes/usuarios.js
    cambio:  > router.use(auth);
-   resultado con la mutación: Tests:       10 failed, 134 passed, 144 total
+   resultado con la mutación: Tests:       10 failed, 136 passed, 146 total
    restaurado (idéntico)
 
 ## M2 — Quitar requireRol('ADMIN') de /api/reportes
    archivo: src/routes/reportes.js
    cambio:  > router.use(auth);
-   resultado con la mutación: Tests:       3 failed, 141 passed, 144 total
+   resultado con la mutación: Tests:       3 failed, 143 passed, 146 total
    restaurado (idéntico)
 
 ## M3 — Borradores: quitar el filtro por dueño (un usuario lee el de otro)
@@ -25,13 +25,13 @@
 ## M5 — Invalidación: permitir al VENDEDOR (política S1)
    archivo: src/config/politicas.js
    cambio:  > const ROLES_INVALIDAR = ['ADMIN', 'VENDEDOR'];
-   resultado con la mutación: Tests:       6 failed, 126 passed, 132 total
+   resultado con la mutación: Tests:       6 failed, 128 passed, 134 total
    restaurado (idéntico)
 
 ## M6 — JWT: aceptar alg none
    archivo: src/middleware/auth.js
    cambio:  >     payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256', 'none'] });
-   resultado con la mutación: Tests:       128 passed, 128 total
+   resultado con la mutación: Tests:       130 passed, 130 total
    restaurado (idéntico)
 
 ## M7 — Correo: responder que sí se envió
@@ -40,11 +40,21 @@
    resultado con la mutación: Tests:       1 failed, 35 passed, 36 total
    restaurado (idéntico)
 
+## M8 — KAN-36: quitar la restricción de lectura de /api/bitacora
+   archivo: src/routes/bitacora.js
+   cambio:  > router.use(auth);
+   resultado con la mutación: Tests:       6 failed, 126 passed, 132 total
+   restaurado (idéntico)
+
 git diff de src tras todas las mutaciones (debe estar vacío para archivos versionados):
 warning: in the working copy of 'backend/src/config/politicas.js', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'backend/src/middleware/auth.js', LF will be replaced by CRLF the next time Git touches it
- backend/src/app.js                          | 3 +++
- backend/src/controllers/dteController.js    | 7 ++++++-
- backend/src/routes/dte.js                   | 1 +
- backend/src/services/dteConsultasService.js | 3 ++-
- 4 files changed, 12 insertions(+), 2 deletions(-)
+warning: in the working copy of 'backend/src/routes/bitacora.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/routes/reportes.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/routes/usuarios.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/borradoresService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/correoService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/usuariosService.js', LF will be replaced by CRLF the next time Git touches it
+ backend/src/config/politicas.js | 9 ++++++++-
+ backend/src/routes/bitacora.js  | 6 ++++--
+ 2 files changed, 12 insertions(+), 3 deletions(-)

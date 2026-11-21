@@ -23,8 +23,8 @@ Estado de los controles de seguridad del POS académico al 2026-11-20, con la ev
 
 | ID | Control | Estado | Evidencia |
 |---|---|---|---|
-| C-09 | `requireRol('ADMIN')` en las 11 rutas de administración (productos POST/PUT, invalidar, contingencia POST y configuración, usuarios ×4, reportes) | ✅ | [autorizacion.md](generado/autorizacion.md): VENDEDOR → 403 sin efectos por 2 vías en las 11; ADMIN autorizado · mutaciones **M1, M2, M5 detectadas** |
-| C-10 | Rutas de uso general no bloquean a ningún rol autenticado | ✅ | [autorizacion.md](generado/autorizacion.md): 29 rutas, VENDEDOR permitido |
+| C-09 | `requireRol('ADMIN')` en las 12 rutas de administración (productos POST/PUT, invalidar, contingencia POST y configuración, usuarios ×4, reportes, **lectura de la bitácora** — KAN-36) | ✅ | [autorizacion.md](generado/autorizacion.md): VENDEDOR → 403 sin efectos por 2 vías en las 12; ADMIN autorizado · mutaciones **M1, M2, M5, M8 detectadas** |
+| C-10 | Rutas de uso general no bloquean a ningún rol autenticado | ✅ | [autorizacion.md](generado/autorizacion.md): 28 rutas, VENDEDOR permitido |
 | C-11 | Invalidación solo ADMIN (política `ROLES_INVALIDAR`, S1) | ✅ | `invalidacion.test.js` › *autorización* (4/4); e2e `02-roles`; mutación M5 · RQ-INV-02 |
 | C-12 | Aislamiento de borradores por usuario (el de otro → 404) | ✅ | `fase6.test.js` › *cada usuario ve solo los suyos*; mutación **M3 detectada** |
 | C-13 | Siempre queda al menos un ADMIN activo; nadie se desactiva ni se quita ADMIN a sí mismo (comprobado con `UPDLOCK`) | ✅ | `fase6.test.js` › *no se puede dejar el sistema sin ADMIN* (409), *nadie se desactiva…*; mutación **M4 detectada** |
@@ -46,7 +46,7 @@ Estado de los controles de seguridad del POS académico al 2026-11-20, con la ev
 
 | ID | Control | Estado | Evidencia |
 |---|---|---|---|
-| C-22 | Bitácora de logins (correctos y fallidos), escrituras, emisiones, eventos y correo simulado | ✅ | `consultas.test.js` › *GET /api/bitacora*; aserciones de bitácora en `contingencia`, `invalidacion`, `fase6` |
+| C-22 | Bitácora de logins (correctos y fallidos), escrituras, emisiones, eventos y correo simulado, **de todos los roles**; su lectura es solo para ADMIN (KAN-36) | ✅ | `consultas.test.js` › *GET /api/bitacora* y *autorización (KAN-36)* › *las acciones del VENDEDOR se siguen registrando*; aserciones de bitácora en `contingencia`, `invalidacion`, `fase6` · RQ-SEG-13 |
 | C-23 | Secretos fuera del repositorio (`backend/.env` ignorado; sin claves ni certificados versionados) | ✅ | `evidencia/07-barrido-secretos.txt` |
 | C-24 | Reportes de prueba sin secretos (`webServer.env` sin `process.env`, corrección de D2) | ✅ | `evidencia/07-barrido-secretos.txt`: 122 archivos y el zip embebido del reporte, sin `JWT_SECRET` ni `DB_PASSWORD` como dato |
 | C-25 | Dependencias sin vulnerabilidades conocidas | ✅ | `evidencia/02-npm-audit.txt`: 0 |
@@ -79,12 +79,12 @@ Matriz completa, generada desde los resultados: **[generado/autorizacion.md](gen
 |---|---|---|---|---|
 | Sin sesión | 40 (todas las protegidas) | 401 `NO_AUTENTICADO`; solo health, login y logout son públicas | 41 | ✅ 41/41 |
 | Token manipulado | — | Rol cambiado en el payload, `alg: none`, otro secreto, rol enviado en el cuerpo | 4 | ✅ 4/4 |
-| VENDEDOR en rutas de solo ADMIN | 11 | 403 `SIN_PERMISO` por **Bearer** y por **cookie + CSRF válido**, y una prueba que compara productos, DTE, contingencia, configuración, usuarios y bitácora antes y después (sin efectos) | 23 | ✅ 23/23 |
-| VENDEDOR en rutas de cualquier rol | 29 | Ningún 401/403 | 29 | ✅ 29/29 |
-| ADMIN en rutas de solo ADMIN | 11 | La operación se ejecuta | 11 | ✅ 11/11 |
-| **Total** `autorizacion.test.js` | **40** | | **108** | **✅ 108/108** |
+| VENDEDOR en rutas de solo ADMIN | 12 | 403 `SIN_PERMISO` por **Bearer** y por **cookie + CSRF válido**, y una prueba que compara productos, DTE, contingencia, configuración, usuarios y bitácora antes y después (sin efectos) | 25 | ✅ 25/25 |
+| VENDEDOR en rutas de cualquier rol | 28 | Ningún 401/403 | 28 | ✅ 28/28 |
+| ADMIN en rutas de solo ADMIN | 12 | La operación se ejecuta | 12 | ✅ 12/12 |
+| **Total** `autorizacion.test.js` | **40** | | **110** | **✅ 110/110** |
 
-Complementan la matriz: `invalidacion.test.js` › *autorización* (VENDEDOR 403 sin cambiar estado, stock ni bitácora), `fase6.test.js` (usuarios y reportes 403 para VENDEDOR; borradores ajenos 404) y la e2e `02-roles.spec.js` (la UI oculta y la API rechaza).
+Complementan la matriz: `consultas.test.js` › *GET /api/bitacora · autorización (KAN-36)* (VENDEDOR 403 con y sin filtros, ADMIN 200, el registro de las acciones del VENDEDOR sigue funcionando y el intento denegado no escribe nada), `invalidacion.test.js` › *autorización* (VENDEDOR 403 sin cambiar estado, stock ni bitácora), `fase6.test.js` (usuarios y reportes 403 para VENDEDOR; borradores ajenos 404) y la e2e `02-roles.spec.js` (la UI oculta y la API rechaza, incluida la bitácora; ADMIN la lee en *Administración → Bitácora*).
 
 **Completitud de la matriz (corregido en esta fase).** Se comparó la lista de rutas registradas en `src/routes/` (43; 40 protegidas) con las de la matriz: faltaba `GET /api/contingencia/ejecuciones` (Fase 5). Se agregó y ahora están las 40 (H-C11).
 
@@ -99,6 +99,7 @@ Complementan la matriz: `invalidacion.test.js` › *autorización* (VENDEDOR 403
 | M5 | Permitir invalidar al VENDEDOR | ✅ 6 fallan |
 | M6 | `jwt.verify` acepta `alg: none` | ➖ no detectada: mutante equivalente (ver abajo) |
 | M7 | El correo responde `enviado: true` | ✅ 1 falla |
+| M8 | Volver a abrir `GET /api/bitacora` a cualquier rol (revertir KAN-36) | ✅ 6 fallan |
 
 M6: `jsonwebtoken` 9 rechaza por sí misma un token sin firma cuando se le pasa un secreto, así que agregar `'none'` a la lista no abre el acceso. Las pruebas de token `alg: none` siguen dando 401 con la mutación. Fijar `algorithms: ['HS256']` es defensa en profundidad, no la única barrera.
 
@@ -117,6 +118,7 @@ M6: `jsonwebtoken` 9 rechaza por sí misma un token sin firma cuando se le pasa 
 | H-C09 | El reporte e2e serializaba `DB_PASSWORD` y `JWT_SECRET` reales (D2) | Alta | `webServer.env` solo con variables no secretas; reportes regenerados. **No llegó a Git** | 4 | `evidencia/07-barrido-secretos.txt` (repetido en esta fase sobre 122 archivos) |
 | H-C10 | La UI afirmaba operaciones que no ocurrían (correo "enviado", "Configuración guardada", certificado "Habilitado" inventado, usuarios ficticios) | Media (integridad de la información) | Correo simulado y rotulado (`enviado: false`), emisor real en solo lectura, firmador rotulado "Simulado", CRUD real de usuarios | 6 | e2e `07-fase6` (5/5); `fase6.test.js`; mutación M7 |
 | H-C11 | La matriz de autorización no cubría `GET /api/contingencia/ejecuciones` | Baja (brecha de prueba) | Ruta agregada a la matriz (+2 casos) | 7 | [autorizacion.md](generado/autorizacion.md): 40/40 |
+| H-C12 | **KAN-36:** `GET /api/bitacora` lo podía leer cualquier usuario autenticado; la historia KAN-32 exige restringirlo. Un VENDEDOR veía logins, acciones y datos de auditoría de todos los usuarios | Media | `requireRol(...ROLES_LEER_BITACORA)` en `routes/bitacora.js`, política `ROLES_LEER_BITACORA = ['ADMIN']` en `config/politicas.js`, mocks del frontend iguales. El **registro** no cambia: las acciones del VENDEDOR se siguen guardando | KAN-36 | Antes: `evidencia/08-kan36-antes.txt` (6 pruebas fallan: VENDEDOR recibía 200). Después: `evidencia/09-kan36-despues.txt` (546/546, e2e 21/21); mutación M8 detectada; RQ-SEG-13 |
 
 ## 4. Hallazgos abiertos y riesgo residual
 

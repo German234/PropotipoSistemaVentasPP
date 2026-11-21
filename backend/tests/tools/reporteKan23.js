@@ -94,6 +94,8 @@ const REQUISITOS = [
   R('RQ-SEG-10', 'UI oculta lo de ADMIN al VENDEDOR y la API lo rechaza', 'Fase F2/S1', [['e2e/02-roles', null]]),
   R('RQ-SEG-11', 'Login, cookie HttpOnly sin JWT en almacenamiento, recarga y logout (UI)', 'SEGURIDAD.md §4', [['e2e/01-login', null]]),
   R('RQ-SEG-12', 'Reset de la demo restaura datos del seed (D1)', 'Fase 4', [['resetDemo', null]]),
+  R('RQ-SEG-13', 'Bitácora: solo ADMIN la lee (VENDEDOR → 403, ADMIN → 200) y se siguen registrando las acciones del VENDEDOR', 'KAN-32 / KAN-36',
+    [['consultas', /KAN-36/], ['autorizacion', /GET \/api\/bitacora$/], ['e2e/02-roles', /bitácora|ADMIN: ve/]]),
   // Fase 6
   R('RQ-F6-01', 'Usuarios: CRUD solo ADMIN, sin hash, no auto-desactivarse, siempre un ADMIN activo', 'Fase 6', [['fase6', /^Usuarios/], ['e2e/07-fase6', /Usuarios/]]),
   R('RQ-F6-02', 'Borradores por usuario (ajeno → 404), total estimado, se eliminan al emitir', 'Fase 6', [['fase6', /^Borradores/], ['e2e/07-fase6', /Borradores/]]),

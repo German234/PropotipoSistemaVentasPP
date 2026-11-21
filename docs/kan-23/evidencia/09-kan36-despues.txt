@@ -1,0 +1,22 @@
+KAN-36 · DESPUÉS de la corrección (routes/bitacora.js → requireRol(...ROLES_LEER_BITACORA), ROLES_LEER_BITACORA = ['ADMIN'])
+Suite completa de Jest: 546/546 aprobadas, 0 fallidas.
+
+Casos de Jest que verifican la corrección:
+  ✓ integration/autorizacion.test.js › Sin sesión → 401 en todas las rutas protegidas › GET /api/bitacora
+  ✓ integration/autorizacion.test.js › VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · GET /api/bitacora
+  ✓ integration/autorizacion.test.js › VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/bitacora
+  ✓ integration/autorizacion.test.js › ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/bitacora
+  ✓ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › ADMIN → 200 con la lista
+  ✓ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (sin filtros), sin datos en la respuesta
+  ✓ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (filtrando por su propio usuario), sin datos en la respuesta
+  ✓ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (por DTE), sin datos en la respuesta
+  ✓ integration/consultas.test.js › GET /api/bitacora · autorización (KAN-36: solo ADMIN) › las acciones del VENDEDOR se siguen registrando (y ADMIN las ve); el intento denegado no deja rastro
+
+Playwright: 21 aprobadas, 0 fallidas, 0 inestables.
+Casos e2e que verifican la corrección:
+  ✓ 02-roles.spec.js › VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia, leer la bitácora)
+  ✓ 02-roles.spec.js › ADMIN: ve Contingencia, Administración, Simular MH y "Anular"
+  ✓ 05-invalidacion-pdf.spec.js › ADMIN anula una factura desde Transacciones: INVALIDADO, stock devuelto y bitácora
+  ✓ 07-fase6.spec.js › Correo: el modal dice que es simulado y la bitácora lo registra; nunca "enviado"
+
+Mutación M8 (quitar la restricción de nuevo): ver 05-mutacion-autorizacion.txt → 6 pruebas fallan (detectada).

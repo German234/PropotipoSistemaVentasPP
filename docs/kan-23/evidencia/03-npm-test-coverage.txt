@@ -1,39 +1,39 @@
-PASS integration tests/integration/tareasProgramadas.test.js (19.153 s)
-PASS integration tests/integration/seguridad.test.js
-PASS integration tests/integration/autorizacion.test.js
-PASS integration tests/integration/pdf.test.js
 PASS integration tests/integration/fase6.test.js
+PASS integration tests/integration/invalidacion.test.js
+PASS integration tests/integration/tareasProgramadas.test.js (18.733 s)
+PASS integration tests/integration/autorizacion.test.js
+PASS integration tests/integration/seguridad.test.js
+PASS integration tests/integration/pdf.test.js
 PASS integration tests/integration/consultaMh.test.js
 PASS integration tests/integration/eventoContingencia.test.js
-PASS integration tests/integration/invalidacion.test.js
 PASS integration tests/integration/catalogos.test.js
 PASS integration tests/integration/loteContingencia.test.js
-PASS integration tests/integration/contingencia.test.js
 PASS integration tests/integration/dte01.factura.test.js
 PASS integration tests/integration/resetDemo.test.js
+PASS integration tests/integration/contingencia.test.js
 PASS integration tests/integration/dte05.notaCredito.test.js
-PASS integration tests/integration/consultas.test.js
 PASS integration tests/integration/dte03.ccf.test.js
+PASS integration tests/integration/consultas.test.js
 PASS integration tests/integration/auth.test.js
 PASS unit tests/unit/contingencia.test.js
 PASS unit tests/unit/builders.test.js
 PASS unit tests/unit/middleware.test.js
-PASS unit tests/unit/calculos.test.js
 PASS unit tests/unit/simuladores.test.js
+PASS unit tests/unit/calculos.test.js
 PASS unit tests/unit/utilidades.test.js
 PASS unit tests/unit/numeroALetras.test.js
 
 =============================== Coverage summary ===============================
-Statements   : 96.72% ( 1980/2047 )
+Statements   : 96.73% ( 1982/2049 )
 Branches     : 84.86% ( 1127/1328 )
 Functions    : 98.34% ( 357/363 )
-Lines        : 98.45% ( 1721/1748 )
+Lines        : 98.45% ( 1723/1750 )
 ================================================================================
 
 Test Suites: 24 passed, 24 total
-Tests:       539 passed, 539 total
+Tests:       546 passed, 546 total
 Snapshots:   0 total
-Time:        46.882 s, estimated 47 s
+Time:        48.459 s, estimated 49 s
 Ran all test suites in 2 projects.
 Test results written to: ..\docs\kan-23\evidencia\jest-resultados.json
 Jest did not exit one second after the test run has completed.

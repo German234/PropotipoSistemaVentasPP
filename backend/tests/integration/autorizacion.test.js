@@ -35,6 +35,7 @@ const SOLO_ADMIN = [
   ['post', '/api/usuarios', { usuario: 'autz.nuevo', nombre: 'Autz Nuevo', rol: 'VENDEDOR', password: 'autznuevo1' }],
   ['put', () => `/api/usuarios/${usuarioId}`, { nombre: 'Autz QA editado' }],
   ['get', '/api/reportes/resumen'],
+  ['get', '/api/bitacora'], // KAN-36: la bitácora de auditoría solo la lee ADMIN
 ];
 const CUALQUIER_ROL = [
   ['get', '/api/auth/sesion'],
@@ -59,7 +60,6 @@ const CUALQUIER_ROL = [
   ['get', '/api/contingencia/consultas'],
   ['get', '/api/contingencia/ejecuciones'],
   ['get', '/api/contingencia/999999'],
-  ['get', '/api/bitacora'],
   ['get', '/api/borradores'],
   ['post', '/api/borradores', { tipoDte: '01', items: [{ productoId: 1, cantidad: 1 }] }],
   ['get', () => `/api/borradores/${borradorId}`],

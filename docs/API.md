@@ -614,7 +614,7 @@ Cualquier rol. Registro de ejecuciones de las tareas programadas, más reciente 
 
 ### GET /api/bitacora?accion=&entidad=&dteId=&usuario=&desde=&hasta=&limite=
 
-Cualquier rol autenticado. Más reciente primero; `limite` 1–1000 (defecto 200). `desde`/`hasta` `YYYY-MM-DD` inclusive; `usuario` = login.
+**Solo ADMIN** (KAN-36; política `ROLES_LEER_BITACORA` en `config/politicas.js`); otro rol → 403 `SIN_PERMISO`. Restringe solo la lectura: las acciones de todos los roles se siguen registrando. Más reciente primero; `limite` 1–1000 (defecto 200). `desde`/`hasta` `YYYY-MM-DD` inclusive; `usuario` = login.
 
 ```json
 {

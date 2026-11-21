@@ -1,11 +1,12 @@
 # Pruebas de autorización por rol (ruta × rol)
 
-> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:04:43 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
+> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:38:01 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
 
 Fuente: `tests/integration/autorizacion.test.js`. "403 sin efectos" = la prueba compara productos, DTE, contingencia, configuración, usuarios y bitácora antes y después de los intentos denegados; se prueba por `Authorization: Bearer` y por cookie de sesión + `X-CSRF-Token` válido.
 
 | Ruta | Política | Sin sesión | VENDEDOR | ADMIN |
 |---|---|---|---|---|
+| `GET /api/bitacora` | **Solo ADMIN** | ✅ 401 | ✅ 403 sin efectos (2 vías) | ✅ permitido |
 | `GET /api/reportes/resumen` | **Solo ADMIN** | ✅ 401 | ✅ 403 sin efectos (2 vías) | ✅ permitido |
 | `GET /api/usuarios` | **Solo ADMIN** | ✅ 401 | ✅ 403 sin efectos (2 vías) | ✅ permitido |
 | `GET /api/usuarios/:id` | **Solo ADMIN** | ✅ 401 | ✅ 403 sin efectos (2 vías) | ✅ permitido |
@@ -19,7 +20,6 @@ Fuente: `tests/integration/autorizacion.test.js`. "403 sin efectos" = la prueba 
 | `PUT /api/usuarios/:id` | **Solo ADMIN** | ✅ 401 | ✅ 403 sin efectos (2 vías) | ✅ permitido |
 | `DELETE /api/borradores/:id` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
 | `GET /api/auth/sesion` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
-| `GET /api/bitacora` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
 | `GET /api/borradores` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
 | `GET /api/borradores/:id` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
 | `GET /api/catalogos` | Cualquier rol | ✅ 401 | ✅ permitido | ✅ permitido (resto de suites) |
@@ -56,4 +56,4 @@ Controles transversales:
 - ✅ Token manipulado → 401 › el rol enviado en el cuerpo se ignora: solo cuenta el del token
 - ✅ VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › ningún intento denegado cambió productos, DTE, contingencia, configuración ni bitácora
 
-**40 rutas protegidas en la matriz; 108/108 casos aprobados.**
+**40 rutas protegidas en la matriz; 110/110 casos aprobados.**

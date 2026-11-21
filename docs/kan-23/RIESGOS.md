@@ -46,7 +46,7 @@ Los dos riesgos residuales altos son **RF-1**, la integración con el MH real, q
 
 | ID | Riesgo | Inherente P×I | Medidas implementadas | Evidencia | Residual P×I | Tratamiento | Resp. |
 |---|---|---|---|---|---|---|---|
-| RA-1 | Un VENDEDOR ejecuta operaciones de ADMIN (invalidar, usuarios, reportes, productos, contingencia) | 3×3 = 9 **Alto** | `requireRol` en 11 rutas; política `ROLES_INVALIDAR`; la UI oculta lo no permitido; borradores aislados por usuario | [autorizacion.md](generado/autorizacion.md) 108/108; mutaciones M1–M5 detectadas; e2e `02-roles` | 1×3 = 3 **Medio** | Mitigar | BE, QA |
+| RA-1 | Un VENDEDOR ejecuta operaciones de ADMIN (invalidar, usuarios, reportes, productos, contingencia) o lee la bitácora de auditoría | 3×3 = 9 **Alto** | `requireRol` en 12 rutas (la bitácora desde KAN-36); política `ROLES_INVALIDAR`; la UI oculta lo no permitido; borradores aislados por usuario | [autorizacion.md](generado/autorizacion.md) 110/110; mutaciones M1–M5 y M8 detectadas; e2e `02-roles` | 1×3 = 3 **Medio** | Mitigar | BE, QA |
 | RA-2 | La sesión sigue válida tras logout, desactivación o cambio de rol (H-A1); un ADMIN degradado conserva permisos hasta 8 h | 2×3 = 6 **Alto** | Un usuario desactivado ya no inicia sesión; el token vence a las 8 h; la UI advierte al desactivar | `fase6` › *desactivado: no inicia sesión*; el caso *no se puede dejar el sistema sin ADMIN* demuestra la ventana | 1×3 = 3 **Medio** | Mitigar. **Pendiente P-01:** revisar `activo`/`rol` en cada petición | BE |
 | RA-3 | La app usa `sa` con una contraseña local débil (H-A2, H-A3): una fuga del `.env` o una inyección daría control total del servidor SQL | 2×3 = 6 **Alto** | SQL siempre parametrizado (revisado: 0 interpolaciones con datos de entrada); `.env` fuera de Git; servidor solo en `localhost` | C-15, C-23; `07-barrido-secretos.txt` | 1×3 = 3 **Medio** | Mitigar. **Pendiente P-02:** usuario con mínimo privilegio y contraseña fuerte | DBA |
 | RA-4 | Fuerza bruta o contraseñas débiles | 3×2 = 6 **Alto** | Límite por usuario+IP e IP (429); bcrypt; contraseña de 8 caracteres como mínimo; hash de relleno | `seguridad` › *Límite de intentos* (6/6); `fase6` › *crear inválido* | 1×2 = 2 **Bajo** | Mitigar (H-A5, H-A11 abiertos, baja) | BE |
@@ -62,7 +62,7 @@ Los dos riesgos residuales altos son **RF-1**, la integración con el MH real, q
 | RD-2 | Pérdida de datos sin respaldos | 2×3 = 6 **Alto** | Esquema y seed reproducibles (`db/01`, `db/02`); los datos de la demo se regeneran | — | 2×2 = 4 **Medio** | **Aceptar** para el uso académico. Respaldos programados de SQL Server si se despliega (P-09) | DBA |
 | RD-3 | Las pruebas modifican la BD de la demo | 2×2 = 4 **Medio** | BD aislada `BatallonAtlacatl_Test`; `setupEnv` y el `globalSetup` de e2e se niegan a usar la de la demo | `06-huella-bd-demo-comparacion.txt`: 12 tablas idénticas | 1×1 = 1 **Bajo** | Mitigar | QA |
 | RD-4 | El reset de la demo borra datos creados después, incluidos usuarios (desde la Fase 6) | 2×2 = 4 **Medio** | Comportamiento documentado en el `README` y en el encabezado del script; restaura el seed completo | `resetDemo.test.js`; D1, D4 | 1×2 = 2 **Bajo** | Aceptar (es su propósito) | DBA |
-| RD-5 | Bitácora alterable con acceso directo a la BD, o llenada con operaciones repetidas (H-A8) | 2×2 = 4 **Medio** | Las escrituras de negocio registran dentro de la misma transacción; cada entrada guarda quién la hizo; la contraseña nunca va a la bitácora | `consultas` › *GET /api/bitacora*; `fase6` › *bitácora sin la contraseña* | 2×2 = 4 **Medio** | Aceptar (P-07, P-09 pendientes) | BE, DBA |
+| RD-5 | Bitácora alterable con acceso directo a la BD, llenada con operaciones repetidas (H-A8) o **leída por quien no debe** | 2×2 = 4 **Medio** | Las escrituras de negocio registran dentro de la misma transacción; cada entrada guarda quién la hizo; la contraseña nunca va a la bitácora; **solo ADMIN la lee** (KAN-36) | `consultas` › *GET /api/bitacora*, *autorización (KAN-36)*; `fase6` › *bitácora sin la contraseña* | 2×2 = 4 **Medio** | Aceptar (P-07, P-09 pendientes) | BE, DBA |
 | RD-6 | Errores que exponen SQL, rutas o usuarios internos | 2×2 = 4 **Medio** | 500 genérico con referencia; health sin el error del driver | `seguridad` › *Errores sin detalles internos* | 1×1 = 1 **Bajo** | Mitigar | BE |
 | RD-7 | Datos personales de clientes (NIT, DUI, teléfono, correo) visibles para todo usuario autenticado y sin cifrado en reposo | 2×2 = 4 **Medio** | Sesión obligatoria; `Cache-Control: no-store` en la API; datos del seed ficticios | RQ-SEG-01; `seguridad` › *Cabeceras* | 1×2 = 2 **Bajo** | Aceptar (el vendedor los necesita para facturar) | PO |
 | RD-8 | Reportes gerenciales con cifras incorrectas o fijas que llevan a malas decisiones | 2×2 = 4 **Medio** | Reportes calculados con los DTE reales (vigentes, NC restadas, en centavos); se eliminaron las cifras fijas (D3) | `fase6` › *totales coherentes con los DTE del período*, *CCF + NC*; e2e *Panel gerencial* | 1×2 = 2 **Bajo** | Mitigar | BE, FE |
@@ -82,7 +82,7 @@ Los dos riesgos residuales altos son **RF-1**, la integración con el MH real, q
 | ID | Riesgo | Inherente P×I | Medidas implementadas | Evidencia | Residual P×I | Tratamiento | Resp. |
 |---|---|---|---|---|---|---|---|
 | RT-1 | Dependencias vulnerables u obsoletas | 2×2 = 4 **Medio** | `npm audit` en cada fase; sin dependencias nuevas de seguridad; `uuid` eliminada | `02-npm-audit.txt`: 0 (H-A10: avisos transitivos de desarrollo) | 1×1 = 1 **Bajo** | Mitigar | BE |
-| RT-2 | Regresiones no detectadas al cambiar el código | 2×3 = 6 **Alto** | 560 casos automatizados; matriz de autorización completa (40/40 rutas); pruebas de mutación; trazabilidad generada que falla si un requisito pierde sus pruebas | `03`, `04`, `05`; [trazabilidad](generado/trazabilidad.md) 46/46 | 1×2 = 2 **Bajo** | Mitigar. El frontend no tiene cobertura medida | QA |
+| RT-2 | Regresiones no detectadas al cambiar el código | 2×3 = 6 **Alto** | 567 casos automatizados; matriz de autorización completa (40/40 rutas); pruebas de mutación; trazabilidad generada que falla si un requisito pierde sus pruebas | `03`, `04`, `05`; [trazabilidad](generado/trazabilidad.md) 47/47 | 1×2 = 2 **Bajo** | Mitigar. El frontend no tiene cobertura medida | QA |
 | RT-3 | Sin decisión de negocio sobre quién puede invalidar (hoy solo ADMIN) | 2×2 = 4 **Medio** | Política centralizada (`config/politicas.js` + `app.js`), cambiable sin tocar la lógica | `invalidacion` › *autorización*; mutación M5 | 2×1 = 2 **Bajo** | Aceptar hasta que el PO decida | PO |
 | RT-4 | Incompatibilidad con otros navegadores (e2e solo en Edge) | 2×1 = 2 **Bajo** | Frontend en JS estándar sin frameworks; la e2e admite `E2E_CHANNEL=chrome/chromium` | `04-npm-test-e2e.txt` | 2×1 = 2 **Bajo** | Aceptar | QA |
 
@@ -90,18 +90,18 @@ Los dos riesgos residuales altos son **RF-1**, la integración con el MH real, q
 
 | Medida | Riesgos | Cómo se verificó en esta ejecución |
 |---|---|---|
-| JSON validado contra los esquemas oficiales del MH | RF-1, RF-6 | `builders.test.js` y `toCumplirEsquemaMh` en las suites de integración: 539/539 |
+| JSON validado contra los esquemas oficiales del MH | RF-1, RF-6 | `builders.test.js` y `toCumplirEsquemaMh` en las suites de integración: 546/546 |
 | Cálculos en centavos y redondeo corregido | RF-3 | 13 casos de redondeo y porcentaje; flujos 01/03/05 con montos exactos (5.66, 113.00, 11.30) |
 | Correlativo bajo `UPDLOCK` | RF-4 | 8 emisiones en paralelo sin números repetidos |
 | Rotulado de lo simulado | RF-2, RD-8 | e2e `07-fase6` (5/5); mutación M7 detectada |
-| Autorización por rol y por dueño | RA-1 | 108/108 casos de la matriz; mutaciones M1–M5 detectadas |
+| Autorización por rol y por dueño (incluida la lectura de la bitácora, KAN-36) | RA-1, RD-5, RD-7 | 110/110 casos de la matriz; mutaciones M1–M5 y M8 detectadas; `consultas` › *autorización (KAN-36)* |
 | Cookie HttpOnly + CSRF, CSP, CORS | RA-5, RA-6 | `seguridad.test.js` 27/27; e2e `01-login` |
 | Límite de intentos de login | RA-4 | 6 casos: bloqueo, `Retry-After`, otro usuario entra, reinicio tras éxito |
 | SQL parametrizado | RA-3 | Revisión de las 20 interpolaciones en SQL de `src/`: solo constantes y marcadores `@p0…` |
 | Secretos fuera de Git y de los reportes | RD-1, RA-3 | `07-barrido-secretos.txt` |
 | Aislamiento de la BD de pruebas | RD-3 | Huella SHA-256 de 12 tablas, 0 cambios |
 | Contingencia: eventos, lotes, cola y tareas persistentes | RC-1 a RC-4 | 101 casos (`contingencia`, `eventoContingencia`, `loteContingencia`, `consultaMh`, `tareasProgramadas`) + e2e `06-contingencia` |
-| Suite de regresión y trazabilidad | RT-2 | 560/560; 46/46 requisitos |
+| Suite de regresión y trazabilidad | RT-2 | 567/567; 47/47 requisitos |
 
 ## Riesgos residuales por área
 

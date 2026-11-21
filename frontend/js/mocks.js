@@ -928,7 +928,7 @@ var MockApi = (function () {
     if (method === 'POST' && (m = /^\/dte\/(\d+)\/invalidar$/.exec(path))) return invalidar(m[1], body, u, modoSimular(headers));
     if (method === 'GET' && path === '/dte') return listarDte(query);
     if (method === 'GET' && (m = /^\/dte\/(\d+)$/.exec(path))) return obtenerDte(m[1]);
-    if (method === 'GET' && path === '/bitacora') return listarBitacora(query);
+    if (method === 'GET' && path === '/bitacora') { requireAdmin(u); return listarBitacora(query); } // KAN-36: solo ADMIN
     if (method === 'POST' && path === '/contingencia') return enviarContingencia(body, u, modoSimular(headers));
     if (method === 'GET' && path === '/contingencia/programacion') return programacionOut();
     if (method === 'GET' && path === '/contingencia/consultas') return consultasOut();

@@ -1,15 +1,15 @@
 # Cobertura de código del backend (Jest)
 
-> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:04:43 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
+> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:38:01 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
 
 Alcance: `backend/src/**/*.js` salvo `server.js` (arranque). El frontend no se instrumenta: se verifica con las pruebas e2e.
 
 | Métrica | % | Cubiertas / total |
 |---|---|---|
-| Sentencias | **96.72 %** | 1980 / 2047 |
+| Sentencias | **96.73 %** | 1982 / 2049 |
 | Ramas | **84.86 %** | 1127 / 1328 |
 | Funciones | **98.34 %** | 357 / 363 |
-| Líneas | **98.45 %** | 1721 / 1748 |
+| Líneas | **98.45 %** | 1723 / 1750 |
 
 ## Por archivo (ordenado por ramas)
 

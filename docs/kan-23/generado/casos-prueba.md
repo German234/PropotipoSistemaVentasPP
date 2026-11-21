@@ -1,8 +1,8 @@
 # Casos de prueba y resultados
 
-> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:04:43 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
+> Generado por `backend/tests/tools/reporteKan23.js` el 2026-11-21 04:38:01 UTC desde `docs/kan-23/evidencia/`. No editar a mano.
 
-**560/560 casos aprobados** (Jest 539/539 en 24 suites; Playwright 21/21).
+**567/567 casos aprobados** (Jest 546/546 en 24 suites; Playwright 21/21).
 
 | Archivo | Tipo | Casos | Aprobados |
 |---|---|---|---|
@@ -14,10 +14,10 @@
 | `tests/e2e/06-contingencia.spec.js` | E2E (navegador) | 2 | 2 |
 | `tests/e2e/07-fase6.spec.js` | E2E (navegador) | 5 | 5 |
 | `tests/integration/auth.test.js` | Integración (API + BD) | 12 | 12 |
-| `tests/integration/autorizacion.test.js` | Integración (API + BD) | 108 | 108 |
+| `tests/integration/autorizacion.test.js` | Integración (API + BD) | 110 | 110 |
 | `tests/integration/catalogos.test.js` | Integración (API + BD) | 41 | 41 |
 | `tests/integration/consultaMh.test.js` | Integración (API + BD) | 22 | 22 |
-| `tests/integration/consultas.test.js` | Integración (API + BD) | 17 | 17 |
+| `tests/integration/consultas.test.js` | Integración (API + BD) | 22 | 22 |
 | `tests/integration/contingencia.test.js` | Integración (API + BD) | 21 | 21 |
 | `tests/integration/dte01.factura.test.js` | Integración (API + BD) | 22 | 22 |
 | `tests/integration/dte03.ccf.test.js` | Integración (API + BD) | 14 | 14 |
@@ -54,7 +54,7 @@
 |---|---|---|
 | 1 | Restricciones por rol › VENDEDOR: no ve opciones de ADMIN en el menú, la venta ni el inventario | ✅ |
 | 2 | Restricciones por rol › VENDEDOR: emite una factura pero no ve "Anular" en Transacciones | ✅ |
-| 3 | Restricciones por rol › VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia) | ✅ |
+| 3 | Restricciones por rol › VENDEDOR: la API rechaza con 403 lo que la UI oculta (invalidar, crear producto, enviar contingencia, leer la bitácora) | ✅ |
 | 4 | Restricciones por rol › ADMIN: ve Contingencia, Administración, Simular MH y "Anular" | ✅ |
 
 ### `tests/e2e/03-clientes.spec.js`
@@ -128,29 +128,29 @@
 | 9 | Sin sesión → 401 en todas las rutas protegidas › POST /api/usuarios | ✅ |
 | 10 | Sin sesión → 401 en todas las rutas protegidas › PUT /api/usuarios/${usuarioId} | ✅ |
 | 11 | Sin sesión → 401 en todas las rutas protegidas › GET /api/reportes/resumen | ✅ |
-| 12 | Sin sesión → 401 en todas las rutas protegidas › GET /api/auth/sesion | ✅ |
-| 13 | Sin sesión → 401 en todas las rutas protegidas › GET /api/productos | ✅ |
-| 14 | Sin sesión → 401 en todas las rutas protegidas › GET /api/productos/${t.prod.P001.id} | ✅ |
-| 15 | Sin sesión → 401 en todas las rutas protegidas › GET /api/clientes | ✅ |
-| 16 | Sin sesión → 401 en todas las rutas protegidas › GET /api/clientes/${clienteId} | ✅ |
-| 17 | Sin sesión → 401 en todas las rutas protegidas › POST /api/clientes | ✅ |
-| 18 | Sin sesión → 401 en todas las rutas protegidas › PUT /api/clientes/${clienteId} | ✅ |
-| 19 | Sin sesión → 401 en todas las rutas protegidas › GET /api/emisor | ✅ |
-| 20 | Sin sesión → 401 en todas las rutas protegidas › GET /api/catalogos | ✅ |
-| 21 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte | ✅ |
-| 22 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/01 | ✅ |
-| 23 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/03 | ✅ |
-| 24 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/05 | ✅ |
-| 25 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte/${ID()} | ✅ |
-| 26 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte/${ID()}/pdf | ✅ |
-| 27 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/${ID()}/reintentar | ✅ |
-| 28 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/${ID()}/consultar | ✅ |
-| 29 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia | ✅ |
-| 30 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/programacion | ✅ |
-| 31 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/consultas | ✅ |
-| 32 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/ejecuciones | ✅ |
-| 33 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/999999 | ✅ |
-| 34 | Sin sesión → 401 en todas las rutas protegidas › GET /api/bitacora | ✅ |
+| 12 | Sin sesión → 401 en todas las rutas protegidas › GET /api/bitacora | ✅ |
+| 13 | Sin sesión → 401 en todas las rutas protegidas › GET /api/auth/sesion | ✅ |
+| 14 | Sin sesión → 401 en todas las rutas protegidas › GET /api/productos | ✅ |
+| 15 | Sin sesión → 401 en todas las rutas protegidas › GET /api/productos/${t.prod.P001.id} | ✅ |
+| 16 | Sin sesión → 401 en todas las rutas protegidas › GET /api/clientes | ✅ |
+| 17 | Sin sesión → 401 en todas las rutas protegidas › GET /api/clientes/${clienteId} | ✅ |
+| 18 | Sin sesión → 401 en todas las rutas protegidas › POST /api/clientes | ✅ |
+| 19 | Sin sesión → 401 en todas las rutas protegidas › PUT /api/clientes/${clienteId} | ✅ |
+| 20 | Sin sesión → 401 en todas las rutas protegidas › GET /api/emisor | ✅ |
+| 21 | Sin sesión → 401 en todas las rutas protegidas › GET /api/catalogos | ✅ |
+| 22 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte | ✅ |
+| 23 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/01 | ✅ |
+| 24 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/03 | ✅ |
+| 25 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/05 | ✅ |
+| 26 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte/${ID()} | ✅ |
+| 27 | Sin sesión → 401 en todas las rutas protegidas › GET /api/dte/${ID()}/pdf | ✅ |
+| 28 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/${ID()}/reintentar | ✅ |
+| 29 | Sin sesión → 401 en todas las rutas protegidas › POST /api/dte/${ID()}/consultar | ✅ |
+| 30 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia | ✅ |
+| 31 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/programacion | ✅ |
+| 32 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/consultas | ✅ |
+| 33 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/ejecuciones | ✅ |
+| 34 | Sin sesión → 401 en todas las rutas protegidas › GET /api/contingencia/999999 | ✅ |
 | 35 | Sin sesión → 401 en todas las rutas protegidas › GET /api/borradores | ✅ |
 | 36 | Sin sesión → 401 en todas las rutas protegidas › POST /api/borradores | ✅ |
 | 37 | Sin sesión → 401 en todas las rutas protegidas › GET /api/borradores/${borradorId} | ✅ |
@@ -173,58 +173,60 @@
 | 54 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · POST /api/usuarios | ✅ |
 | 55 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · PUT /api/usuarios/${usuarioId} | ✅ |
 | 56 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · GET /api/reportes/resumen | ✅ |
-| 57 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/productos | ✅ |
-| 58 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/productos/${t.prod.P001.id} | ✅ |
-| 59 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/dte/${ID()}/invalidar | ✅ |
-| 60 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/contingencia | ✅ |
-| 61 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/contingencia/programacion | ✅ |
-| 62 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/contingencia/consultas | ✅ |
-| 63 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/usuarios | ✅ |
-| 64 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/usuarios/${usuarioId} | ✅ |
-| 65 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/usuarios | ✅ |
-| 66 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/usuarios/${usuarioId} | ✅ |
-| 67 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/reportes/resumen | ✅ |
-| 68 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › ningún intento denegado cambió productos, DTE, contingencia, configuración ni bitácora | ✅ |
-| 69 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/auth/sesion | ✅ |
-| 70 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/productos | ✅ |
-| 71 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/productos/${t.prod.P001.id} | ✅ |
-| 72 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/clientes | ✅ |
-| 73 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/clientes/${clienteId} | ✅ |
-| 74 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/clientes | ✅ |
-| 75 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · PUT /api/clientes/${clienteId} | ✅ |
-| 76 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/emisor | ✅ |
-| 77 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/catalogos | ✅ |
-| 78 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte | ✅ |
-| 79 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/01 | ✅ |
-| 80 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/03 | ✅ |
-| 81 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/05 | ✅ |
-| 82 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte/${ID()} | ✅ |
-| 83 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte/${ID()}/pdf | ✅ |
-| 84 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/reintentar | ✅ |
-| 85 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/consultar | ✅ |
-| 86 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia | ✅ |
-| 87 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/programacion | ✅ |
-| 88 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/consultas | ✅ |
-| 89 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/ejecuciones | ✅ |
-| 90 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/999999 | ✅ |
-| 91 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/bitacora | ✅ |
-| 92 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/borradores | ✅ |
-| 93 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/borradores | ✅ |
-| 94 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/borradores/${borradorId} | ✅ |
-| 95 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · PUT /api/borradores/${borradorId} | ✅ |
-| 96 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · DELETE /api/borradores/${borradorId} | ✅ |
-| 97 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/correo | ✅ |
-| 98 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/productos | ✅ |
-| 99 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/productos/${t.prod.P001.id} | ✅ |
-| 100 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/dte/${ID()}/invalidar | ✅ |
-| 101 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/contingencia | ✅ |
-| 102 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/contingencia/programacion | ✅ |
-| 103 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/contingencia/consultas | ✅ |
-| 104 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/usuarios | ✅ |
-| 105 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/usuarios/${usuarioId} | ✅ |
-| 106 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/usuarios | ✅ |
-| 107 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/usuarios/${usuarioId} | ✅ |
-| 108 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/reportes/resumen | ✅ |
+| 57 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › Bearer · GET /api/bitacora | ✅ |
+| 58 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/productos | ✅ |
+| 59 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/productos/${t.prod.P001.id} | ✅ |
+| 60 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/dte/${ID()}/invalidar | ✅ |
+| 61 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/contingencia | ✅ |
+| 62 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/contingencia/programacion | ✅ |
+| 63 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/contingencia/consultas | ✅ |
+| 64 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/usuarios | ✅ |
+| 65 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/usuarios/${usuarioId} | ✅ |
+| 66 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · POST /api/usuarios | ✅ |
+| 67 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · PUT /api/usuarios/${usuarioId} | ✅ |
+| 68 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/reportes/resumen | ✅ |
+| 69 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › cookie + CSRF válido · GET /api/bitacora | ✅ |
+| 70 | VENDEDOR en rutas de solo ADMIN → 403 SIN_PERMISO sin efectos › ningún intento denegado cambió productos, DTE, contingencia, configuración ni bitácora | ✅ |
+| 71 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/auth/sesion | ✅ |
+| 72 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/productos | ✅ |
+| 73 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/productos/${t.prod.P001.id} | ✅ |
+| 74 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/clientes | ✅ |
+| 75 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/clientes/${clienteId} | ✅ |
+| 76 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/clientes | ✅ |
+| 77 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · PUT /api/clientes/${clienteId} | ✅ |
+| 78 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/emisor | ✅ |
+| 79 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/catalogos | ✅ |
+| 80 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte | ✅ |
+| 81 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/01 | ✅ |
+| 82 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/03 | ✅ |
+| 83 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/05 | ✅ |
+| 84 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte/${ID()} | ✅ |
+| 85 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/dte/${ID()}/pdf | ✅ |
+| 86 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/reintentar | ✅ |
+| 87 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/consultar | ✅ |
+| 88 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia | ✅ |
+| 89 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/programacion | ✅ |
+| 90 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/consultas | ✅ |
+| 91 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/ejecuciones | ✅ |
+| 92 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/contingencia/999999 | ✅ |
+| 93 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/borradores | ✅ |
+| 94 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/borradores | ✅ |
+| 95 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · GET /api/borradores/${borradorId} | ✅ |
+| 96 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · PUT /api/borradores/${borradorId} | ✅ |
+| 97 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · DELETE /api/borradores/${borradorId} | ✅ |
+| 98 | Rutas de cualquier rol: ningún usuario autenticado recibe 403 › VENDEDOR · POST /api/dte/${ID()}/correo | ✅ |
+| 99 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/productos | ✅ |
+| 100 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/productos/${t.prod.P001.id} | ✅ |
+| 101 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/dte/${ID()}/invalidar | ✅ |
+| 102 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/contingencia | ✅ |
+| 103 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/contingencia/programacion | ✅ |
+| 104 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/contingencia/consultas | ✅ |
+| 105 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/usuarios | ✅ |
+| 106 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/usuarios/${usuarioId} | ✅ |
+| 107 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › POST /api/usuarios | ✅ |
+| 108 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › PUT /api/usuarios/${usuarioId} | ✅ |
+| 109 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/reportes/resumen | ✅ |
+| 110 | ADMIN en rutas de solo ADMIN: autorizado (la operación se ejecuta) › GET /api/bitacora | ✅ |
 
 ### `tests/integration/catalogos.test.js`
 
@@ -320,6 +322,11 @@
 | 15 | GET /api/bitacora › registra cada operación con la acción y el resultado | ✅ |
 | 16 | GET /api/bitacora › filtros accion, usuario, dteId y limite | ✅ |
 | 17 | GET /api/bitacora › limite fuera de 1–1000 → 400 | ✅ |
+| 18 | GET /api/bitacora · autorización (KAN-36: solo ADMIN) › ADMIN → 200 con la lista | ✅ |
+| 19 | GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (sin filtros), sin datos en la respuesta | ✅ |
+| 20 | GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (filtrando por su propio usuario), sin datos en la respuesta | ✅ |
+| 21 | GET /api/bitacora · autorización (KAN-36: solo ADMIN) › VENDEDOR → 403 SIN_PERMISO (por DTE), sin datos en la respuesta | ✅ |
+| 22 | GET /api/bitacora · autorización (KAN-36: solo ADMIN) › las acciones del VENDEDOR se siguen registrando (y ADMIN las ve); el intento denegado no deja rastro | ✅ |
 
 ### `tests/integration/contingencia.test.js`
 
